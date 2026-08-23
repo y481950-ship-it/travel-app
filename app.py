@@ -32,8 +32,8 @@ else:
 
 API_KEY = "AQ.Ab8RN6KNyTYb9CRCpApOtdKKdV5AhjT07NZ5PVbe7ZSIzCXOPw"
 
-# 고화질 바이크 전용 앱 아이콘
-APP_ICON_URL = "https://cdn-icons-png.flaticon.com/512/3097/3097180.png"
+# 고화질 레드/블랙 바이크 전용 아이콘 (512x512)
+APP_ICON_URL = "https://cdn-icons-png.flaticon.com/512/3198/3198336.png"
 
 HTML_TEMPLATE = f"""
 <!DOCTYPE html>
@@ -154,6 +154,11 @@ HTML_TEMPLATE = f"""
     </div>
 
     <script>
+        // 서비스 워커 등록 (PWA 앱 독립 실행용)
+        if ('serviceWorker' in navigator) {{
+            navigator.serviceWorker.register('/sw.js');
+        }}
+
         let currentPayload = {{}};
 
         function toggleRegion() {{
@@ -296,6 +301,11 @@ def markdown_to_html(text):
     text = re.sub(r'\*\*(.*?)\*\*', r'<strong>\1</strong>', text)
     text = text.replace('\n', '<br>')
     return text
+
+@app.route('/sw.js')
+def service_worker():
+    sw_code = "self.addEventListener('install', (e) => self.skipWaiting()); self.addEventListener('activate', (e) => self.clients.claim()); self.addEventListener('fetch', (e) => {});"
+    return Response(sw_code, mimetype='application/javascript')
 
 @app.route('/manifest.json')
 def manifest():
