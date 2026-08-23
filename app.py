@@ -22,7 +22,6 @@ st.set_page_config(
 components.html(
     """
     <script>
-    // 브라우저의 제멋대로 새로고침(Pull-to-refresh) 강제 무효화
     window.addEventListener('scroll', function() {}, {passive: true});
     document.addEventListener("visibilitychange", function() {
         if (document.visibilityState === 'visible') {
@@ -114,14 +113,13 @@ def generate_pdf(text_content):
 # 4. Gemini API 키 고정
 API_KEY = "AQ.Ab8RN6KNyTYb9CRCpApOtdKKdV5AhjT07NZ5PVbe7ZSIzCXOPw"
 
-# 5. 세션 상태 관리 (초기화 방지)
+# 5. 세션 상태 관리
 if "plan_result" not in st.session_state:
     st.session_state.plan_result = ""
 
 # 6. 화면 구성
 st.title("🏍️ 박영선의 AI 여행 플래너")
 
-# 일정이 생성되어 있으면 입력 폼을 가리고 결과에 집중 (원할 때만 다시 설정)
 if not st.session_state.plan_result:
     start_type = st.radio("출발지 설정", ["📍 현재 위치 사용 (경기 여주 기준)", "✏️ 다른 지역 직접 입력"], horizontal=True)
     
@@ -176,13 +174,15 @@ if not st.session_state.plan_result:
                         """
                         if avoid_large_roads:
                             prompt += """
-                    2. [4차선 대로 완전 배제]:
+                    2. [도로 선택 - 4차선 완전 배제 모드]:
                        - 왕복 4차선 이상의 넓은 국도, 대로, 고속화도로는 완전히 제외할 것.
                        - 소요 시간이 더 걸리고 멀리 돌아가더라도 반드시 1.5차선~2차선 한적한 시골길, 마을 안길, 산길 지방도(군도/지방도/와인딩 코스) 위주로만 동선을 짤 것.
                             """
                         else:
                             prompt += """
-                    2. 경치 좋은 2차선 지방도 및 와인딩 코스를 우선하되 이동 효율을 고려할 것.
+                    2. [도로 선택 - 일반 도로 허용 모드]:
+                       - 4차선 일반 국도 및 주요 간선도로 주행을 적극 포함하여 이동 속도와 효율성을 높일 것.
+                       - 주요 목적지 간 빠른 연결 도로는 4차선 국도를 활용하고, 필요한 경우에만 2차선 지방도를 연계할 것.
                             """
                         
                         prompt += """
@@ -211,7 +211,6 @@ if not st.session_state.plan_result:
                     st.error(f"생성 중 오류 발생: {e}")
 
 else:
-    # 일정이 생성된 후의 화면 (스크롤 간섭 완전 차단)
     st.markdown("### 🗺️ 생성된 맞춤 여행 일정")
     st.markdown(st.session_state.plan_result)
     
