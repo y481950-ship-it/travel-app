@@ -98,7 +98,7 @@ if st.button("🚀 맞춤 여행 일정 만들기"):
         with st.spinner("최적의 일정을 생성하는 중..."):
             try:
                 genai.configure(api_key=API_KEY)
-                model = genai.GenerativeModel("gemini-2.5-flash")
+                model = genai.GenerativeModel("gemini-3.6-flash")
                 
                 # 프롬프트 구성
                 prompt = f"""
