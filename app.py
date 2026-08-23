@@ -17,12 +17,35 @@ st.set_page_config(
     initial_sidebar_state="collapsed"
 )
 
+# 모바일 화면 이탈 및 당겨서 새로고침(Pull-to-refresh) 완벽 차단 CSS
 st.markdown("""
 <style>
-    .block-container { padding: 1.5rem 1rem 3rem 1rem !important; }
-    h1, h2, h3 { font-size: 1.4rem !important; line-height: 1.3 !important; }
-    p, div, label { font-size: 0.95rem !important; }
-    .stButton>button { width: 100% !important; border-radius: 8px !important; height: 3rem !important; font-weight: bold !important; }
+    /* 화면 위/아래 바운스 및 당겨서 새로고침 방지 */
+    html, body, [data-testid="stAppViewContainer"] {
+        overscroll-behavior-y: contain !important;
+        overscroll-behavior-x: none !important;
+        -webkit-overflow-scrolling: touch;
+    }
+    
+    .block-container { 
+        padding: 1.5rem 1rem 3rem 1rem !important; 
+    }
+    
+    h1, h2, h3 { 
+        font-size: 1.4rem !important; 
+        line-height: 1.3 !important; 
+    }
+    
+    p, div, label { 
+        font-size: 0.95rem !important; 
+    }
+    
+    .stButton>button { 
+        width: 100% !important; 
+        border-radius: 8px !important; 
+        height: 3rem !important; 
+        font-weight: bold !important; 
+    }
 </style>
 """, unsafe_allow_html=True)
 
@@ -70,14 +93,13 @@ def generate_pdf(text_content):
     buffer.seek(0)
     return buffer
 
-# 4. Gemini API 키
+# 4. Gemini API 키 고정
 API_KEY = "AQ.Ab8RN6KNyTYb9CRCpApOtdKKdV5AhjT07NZ5PVbe7ZSIzCXOPw"
 
 # 5. 화면 구성
 st.title("📱 AI 맞춤 여행 플래너")
 
 with st.expander("📝 여행 조건 입력하기", expanded=True):
-    # 출발지 설정 (현재 위치 / 직접 입력)
     start_mode = st.radio("출발지 선택 방식", ["직접 입력", "현재 내 위치 (자동 기준)"], horizontal=True)
     
     if start_mode == "직접 입력":
