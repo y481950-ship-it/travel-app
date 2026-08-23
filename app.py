@@ -7,9 +7,8 @@ from reportlab.lib.pagesizes import A4
 from reportlab.platypus import SimpleDocTemplate, Paragraph, Spacer
 from reportlab.lib.styles import getSampleStyleSheet, ParagraphStyle
 import urllib.request
-import streamlit.components.v1 as components
 
-# 1. 모바일 뷰포트 설정
+# 1. 모바일 뷰포트 및 기본 설정
 st.set_page_config(
     page_title="박영선의 AI 여행 플래너",
     page_icon="🏍️",
@@ -17,57 +16,31 @@ st.set_page_config(
     initial_sidebar_state="collapsed"
 )
 
-# 모바일 '당겨서 새로고침(Pull-to-refresh)' 원천 차단 스크립트
-components.html(
-    """
-    <script>
-    (function() {
-        var parentWindow = window.parent;
-        var parentDoc = window.parent.document;
-        
-        var startY = 0;
-        
-        parentDoc.addEventListener('touchstart', function(e) {
-            startY = e.touches[0].pageY;
-        }, { passive: false });
-
-        parentDoc.addEventListener('touchmove', function(e) {
-            var moveY = e.touches[0].pageY;
-            // 최상단에서 아래로 당기는 제스처만 원천 차단
-            if (parentDoc.documentElement.scrollTop <= 0 && parentDoc.body.scrollTop <= 0 && moveY > startY) {
-                if (e.cancelable) {
-                    e.preventDefault();
-                }
-            }
-        }, { passive: false });
-    })();
-    </script>
-    """,
-    height=0,
-    width=0
-)
-
-# CSS로도 2중 차단 및 스크롤 최적화
+# 모바일 새로고침 원천 차단 + 완벽한 상하 터치 스크롤 CSS
 st.markdown("""
 <style>
-    html, body {
-        overscroll-behavior-y: none !important;
-        overscroll-behavior: none !important;
+    /* 1. 최상단 당겨서 새로고침(Pull-to-refresh) 완벽 차단 */
+    html, body, .stApp, section.main, [data-testid="stAppViewContainer"] {
+        overscroll-behavior-y: contain !important;
+        overscroll-behavior: contain !important;
         -webkit-overflow-scrolling: touch !important;
+        touch-action: pan-y !important;
     }
     
-    [data-testid="stAppViewContainer"] {
-        overscroll-behavior-y: none !important;
+    /* 2. 메인 스크롤 영역 부드럽게 유지 */
+    section.main {
         overflow-y: auto !important;
     }
     
+    /* 3. 모바일 여백 및 레이아웃 */
     .block-container { 
         padding-top: 1.2rem !important; 
-        padding-bottom: 5rem !important; 
+        padding-bottom: 6rem !important; 
         padding-left: 1rem !important; 
         padding-right: 1rem !important; 
     }
     
+    /* 4. 본문 및 제목 가독성 최적화 */
     p, span, div, li { 
         font-size: 1.1rem !important; 
         line-height: 1.6 !important; 
@@ -77,18 +50,24 @@ st.markdown("""
     h2 { font-size: 1.35rem !important; font-weight: bold !important; color: #1e3d59 !important; }
     h3 { font-size: 1.2rem !important; font-weight: bold !important; color: #17b978 !important; }
     
+    /* 5. 지도 링크 가시성 확보 */
     a {
         font-size: 1.1rem !important;
         font-weight: bold !important;
         text-decoration: underline !important;
     }
     
+    /* 6. 터치 버튼 최적화 */
     .stButton>button { 
         width: 100% !important; 
         border-radius: 10px !important; 
         height: 3.4rem !important; 
         font-size: 1.15rem !important;
         font-weight: bold !important; 
+    }
+    
+    div[role="radiogroup"] {
+        gap: 0.5rem;
     }
 </style>
 """, unsafe_allow_html=True)
