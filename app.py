@@ -8,68 +8,12 @@ from reportlab.platypus import SimpleDocTemplate, Paragraph, Spacer
 from reportlab.lib.styles import getSampleStyleSheet, ParagraphStyle
 import urllib.request
 
-# 1. 모바일 기본 설정
+# 1. 기본 설정
 st.set_page_config(
     page_title="박영선의 AI 여행 플래너",
     page_icon="🏍️",
-    layout="centered",
-    initial_sidebar_state="collapsed"
+    layout="centered"
 )
-
-# 상향 스크롤 시 브라우저 간섭 차단 및 양방향 가속 스크롤 강제
-st.markdown("""
-<style>
-    /* 1. 상단 새로고침 제스처 간섭을 차단해 위로 올릴 때 멈추는 현상 해결 */
-    html, body {
-        overscroll-behavior-y: none !important;
-        -webkit-overflow-scrolling: touch !important;
-    }
-    
-    /* 2. 실제 내용물 박스에 상하 양방향 관성 터치 스크롤 부여 */
-    [data-testid="stAppViewContainer"], section.main {
-        overflow-y: auto !important;
-        -webkit-overflow-scrolling: touch !important;
-        overscroll-behavior-y: none !important;
-        touch-action: pan-y !important;
-    }
-
-    .block-container { 
-        padding-top: 1.2rem !important; 
-        padding-bottom: 6rem !important; 
-        padding-left: 0.8rem !important; 
-        padding-right: 0.8rem !important; 
-        max-width: 100% !important;
-    }
-    
-    /* 폰트 및 버튼 크기 */
-    p, span, div, li { 
-        font-size: 1.1rem !important; 
-        line-height: 1.6 !important; 
-    }
-    
-    h1 { font-size: 1.55rem !important; font-weight: bold !important; }
-    h2 { font-size: 1.35rem !important; font-weight: bold !important; color: #1e3d59 !important; }
-    h3 { font-size: 1.2rem !important; font-weight: bold !important; color: #17b978 !important; }
-    
-    a {
-        font-size: 1.1rem !important;
-        font-weight: bold !important;
-        text-decoration: underline !important;
-    }
-    
-    .stButton>button { 
-        width: 100% !important; 
-        border-radius: 10px !important; 
-        height: 3.4rem !important; 
-        font-size: 1.15rem !important;
-        font-weight: bold !important; 
-    }
-    
-    div[role="radiogroup"] {
-        gap: 0.5rem;
-    }
-</style>
-""", unsafe_allow_html=True)
 
 # 2. 한글 폰트 설정 (PDF용)
 FONT_PATH = "NanumGothic.ttf"
