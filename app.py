@@ -6,11 +6,10 @@ import re
 from reportlab.lib.pagesizes import A4
 from reportlab.platypus import SimpleDocTemplate, Paragraph, Spacer
 from reportlab.lib.styles import getSampleStyleSheet, ParagraphStyle
-from reportlab.pdfgen import canvas
 import urllib.request
 import streamlit.components.v1 as components
 
-# 1. 모바일 뷰포트 및 기본 설정
+# 1. 모바일 화면 및 가독성 최적화 설정
 st.set_page_config(
     page_title="박영선의 AI 여행 플래너",
     page_icon="🏍️",
@@ -18,7 +17,7 @@ st.set_page_config(
     initial_sidebar_state="collapsed"
 )
 
-# 세션 유지 및 모바일 브라우저 오동작 방지
+# 당겨서 새로고침 방지
 components.html(
     """
     <script>
@@ -34,7 +33,7 @@ components.html(
     width=0
 )
 
-# 자유로운 터치 스크롤 허용 + 상단 튕김 방지 CSS
+# 글씨 크기 대폭 확대 및 시원한 가독성 CSS
 st.markdown("""
 <style>
     html, body {
@@ -43,25 +42,34 @@ st.markdown("""
     }
     .block-container { 
         padding-top: 1rem !important; 
-        padding-bottom: 4rem !important; 
-        padding-left: 0.8rem !important; 
-        padding-right: 0.8rem !important; 
+        padding-bottom: 5rem !important; 
+        padding-left: 1rem !important; 
+        padding-right: 1rem !important; 
     }
-    h1, h2, h3 { 
-        font-size: 1.35rem !important; 
-        line-height: 1.3 !important; 
+    /* 본문 글씨 크기 큼직하게 확대 */
+    p, span, div, li { 
+        font-size: 1.15rem !important; 
+        line-height: 1.6 !important; 
     }
-    p, div, label { 
-        font-size: 0.95rem !important; 
+    /* 제목 글씨 확대 */
+    h1 { font-size: 1.6rem !important; font-weight: bold !important; }
+    h2 { font-size: 1.4rem !important; font-weight: bold !important; color: #1e3d59 !important; }
+    h3 { font-size: 1.25rem !important; font-weight: bold !important; color: #17b978 !important; }
+    
+    /* 지도 링크 가시성 극대화 */
+    a {
+        font-size: 1.15rem !important;
+        font-weight: bold !important;
+        text-decoration: underline !important;
     }
+    
+    /* 터치 버튼 큼직하게 */
     .stButton>button { 
         width: 100% !important; 
-        border-radius: 8px !important; 
-        height: 3rem !important; 
+        border-radius: 10px !important; 
+        height: 3.5rem !important; 
+        font-size: 1.2rem !important;
         font-weight: bold !important; 
-    }
-    div[role="radiogroup"] {
-        gap: 0.4rem;
     }
 </style>
 """, unsafe_allow_html=True)
@@ -86,21 +94,19 @@ else:
 # 3. PDF 생성 함수
 def generate_pdf(text_content):
     buffer = io.BytesIO()
-    doc = SimpleDocTemplate(buffer, pagesize=A4, rightMargin=30, leftMargin=30, topMargin=35, bottomMargin=35)
+    doc = SimpleDocTemplate(buffer, pagesize=A4, rightMargin=25, leftMargin=25, topMargin=30, bottomMargin=30)
     styles = getSampleStyleSheet()
-    normal_style = ParagraphStyle(name='MobileNormal', fontName=MAIN_FONT, fontSize=10, leading=15, textColor='#333333')
-    title_style = ParagraphStyle(name='MobileTitle', fontName=MAIN_FONT, fontSize=14, leading=18, textColor='#1a5fb4', spaceAfter=10)
+    normal_style = ParagraphStyle(name='BigNormal', fontName=MAIN_FONT, fontSize=11, leading=16, textColor='#333333')
+    title_style = ParagraphStyle(name='BigTitle', fontName=MAIN_FONT, fontSize=15, leading=20, textColor='#1a5fb4', spaceAfter=10)
     
     story = []
     lines = text_content.split('\n')
-    
     for line in lines:
         line = re.sub(r'\[([^\]]+)\]\([^\)]+\)', r'\1', line)
         cleaned_line = re.sub(r'[*#_`]', '', line).strip()
         if not cleaned_line:
             story.append(Spacer(1, 8))
             continue
-        
         if line.startswith('#') or '일차' in line or 'Day' in line:
             story.append(Paragraph(cleaned_line, title_style))
         else:
@@ -110,31 +116,31 @@ def generate_pdf(text_content):
     buffer.seek(0)
     return buffer
 
-# 4. Gemini API 키 고정
 API_KEY = "AQ.Ab8RN6KNyTYb9CRCpApOtdKKdV5AhjT07NZ5PVbe7ZSIzCXOPw"
 
-# 5. 세션 상태 관리
 if "plan_result" not in st.session_state:
     st.session_state.plan_result = ""
 
-# 6. 화면 구성
 st.title("🏍️ 박영선의 AI 여행 플래너")
 
 if not st.session_state.plan_result:
-    start_type = st.radio("출발지 설정", ["📍 현재 위치 사용 (경기 여주 기준)", "✏️ 다른 지역 직접 입력"], horizontal=True)
+    # 국내 / 해외 선택 (일본 투어 대비 구글맵 자동 전환)
+    trip_region = st.radio("여행 지역 선택", ["🇰🇷 국내 투어", "🇯🇵 해외/일본 투어"], horizontal=True)
     
-    if start_type == "✏️ 다른 지역 직접 입력":
-        start_location = st.text_input("출발지 입력", placeholder="예: 서울 강남, 수원, 대전 등")
+    if trip_region == "🇰🇷 국내 투어":
+        start_type = st.radio("출발지 설정", ["📍 현재 위치 (경기 여주)", "✏️ 다른 지역 직접 입력"], horizontal=True)
+        if start_type == "✏️ 다른 지역 직접 입력":
+            start_location = st.text_input("출발지 입력", placeholder="예: 서울 강남, 수원, 대전 등")
+        else:
+            start_location = "경기 여주(현재 위치)"
     else:
-        start_location = "경기 여주(사용자 현재 위치)"
-        st.success("📍 현재 계신 위치(여주)를 출발지로 자동 설정했습니다.")
+        start_location = st.text_input("해외 출발지(공항/항구/도시)", placeholder="예: 후쿠오카 공항, 시모노세키항, 도쿄")
 
-    destination = st.text_input("목적지 (도착지)", placeholder="예: 영월, 속초, 남해, 양평")
+    destination = st.text_input("목적지 (도착지)", placeholder="예: 양양, 영월, 규슈 아소산, 홋카이도")
     
     st.write("**여행 기간**")
-    duration = st.radio("여행 기간 선택", ["당일치기", "1박 2일", "2박 3일", "3박 4일"], horizontal=True, label_visibility="collapsed")
+    duration = st.radio("여행 기간 선택", ["당일치기", "1박 2일", "2박 3일", "3박 4일", "4박 5일 이상"], horizontal=True, label_visibility="collapsed")
     
-    # 바이크 전용 설정
     is_bike_mode = st.checkbox("🏍️ 바이크 투어 모드 (라이딩 전용 경로)", value=True)
     avoid_large_roads = False
     if is_bike_mode:
@@ -143,64 +149,58 @@ if not st.session_state.plan_result:
     st.write("**여행 스타일**")
     style = st.radio("여행 스타일 선택", ["자연/풍경 감상", "맛집/카페 투어", "관광지 위주", "액티비티/체험", "휴양/힐링"], label_visibility="collapsed")
     
-    extra_requests = st.text_input("기타 요청사항", placeholder="예: 한적한 와인딩 코스, 뷰 맛집 위주")
+    extra_requests = st.text_input("기타 요청사항", placeholder="예: 한적한 와인딩 코스, 바이크 전용 뷰 포인트")
 
-    if st.button("🚀 맞춤 여행 일정 만들기"):
-        if not destination or (start_type == "✏️ 다른 지역 직접 입력" and not start_location):
+    if st.button("🚀 큼직한 글씨로 일정 생성하기"):
+        if not destination or (trip_region == "🇰🇷 국내 투어" and start_type == "✏️ 다른 지역 직접 입력" and not start_location):
             st.warning("출발지와 목적지를 모두 입력해주세요.")
         else:
-            with st.spinner("최적의 맞춤 일정을 생성하는 중..."):
+            with st.spinner("가독성 높은 최적의 코스를 구성 중..."):
                 try:
                     genai.configure(api_key=API_KEY)
                     model = genai.GenerativeModel("gemini-3.6-flash")
                     
                     prompt = f"""
-                    다음 조건으로 여행 일정을 작성해줘.
+                    다음 조건으로 라이딩/여행 일정을 작성해줘.
+                    - 지역 구분: {trip_region}
                     - 출발지: {start_location}
                     - 목적지: {destination}
                     - 일정: {duration}
                     - 여행 스타일: {style}
-                    - 추가 요구사항: {extra_requests}
+                    - 추가 요청: {extra_requests}
 
                     [🚫 출발지 인근 경유지 절대 배제 규칙]
-                    - 출발지(예: 여주) 내부의 관광지, 유원지, 인근 카페 등은 절대 첫 번째 경유지로 넣지 말 것.
-                    - 출발지에서는 바로 목적지 방향으로 최소 1시간 이상 라이딩/이동한 후, 첫 번째 휴식지나 목적지 방향의 본격적인 경유지가 나오도록 동선을 구성할 것.
+                    - 출발지 내부/인근의 유원지나 카페는 첫 경유지로 잡지 말 것.
+                    - 출발지에서 목적지 방향으로 최소 1시간 이상 주행한 후 첫 경유지가 나오도록 할 것.
                     """
                     
                     if is_bike_mode:
-                        prompt += """
-                    [🏍️ 바이크 투어 필수 원칙]
-                    1. 고속도로 및 자동차 전용도로는 100% 절대 진입 불가 (이륜차 통행 금지 도로 원천 배제).
-                        """
-                        if avoid_large_roads:
-                            prompt += """
-                    2. [도로 선택 - 4차선 완전 배제 모드]:
-                       - 왕복 4차선 이상의 넓은 국도, 대로, 고속화도로는 완전히 제외할 것.
-                       - 소요 시간이 더 걸리고 멀리 돌아가더라도 반드시 1.5차선~2차선 한적한 시골길, 마을 안길, 산길 지방도(군도/지방도/와인딩 코스) 위주로만 동선을 짤 것.
-                            """
-                        else:
-                            prompt += """
-                    2. [도로 선택 - 일반 도로 허용 모드]:
-                       - 4차선 일반 국도 및 주요 간선도로 주행을 적극 포함하여 이동 속도와 효율성을 높일 것.
-                       - 주요 목적지 간 빠른 연결 도로는 4차선 국도를 활용하고, 필요한 경우에만 2차선 지방도를 연계할 것.
-                            """
+                        if trip_region == "🇰🇷 국내 투어":
+                            prompt += "\n- 고속도로/자동차전용도로 진입 금지(이륜차 통행 금지 도로 절대 배제)."
                         
+                        if avoid_large_roads:
+                            prompt += "\n- [4차선 대로 배제]: 4차선 이상 넓은 도로는 제외하고, 멀리 돌더라도 1.5~2차선 한적한 시골길/산길 와인딩 지방도로만 연결할 것."
+                        else:
+                            prompt += "\n- [일반 도로 허용]: 빠른 주행을 위해 4차선 일반 국도 및 주요 도로 주행을 적극 포함할 것."
+                    
+                    # 지도 링크 분기 (국내: 네이버/카카오, 해외: 구글지도)
+                    if trip_region == "🇰🇷 국내 투어":
                         prompt += """
-                    3. 장소 추천: 라이더 카페, 경치 좋은 뷰 포인트, 오토바이 주차가 편리한 맛집 포함.
-                    4. 지도 길찾기 연동 링크 (매우 중요):
-                       - 주요 경유지 및 장소명 뒤에 아래 형식으로 네이버/카카오 지도 검색 링크를 반드시 포함할 것.
-                       - 형식: [장소명](https://map.naver.com/v5/search/{장소명}) | [카카오맵](https://map.kakao.com/link/search/{장소명})
+                    [지도 링크 형식]
+                    - 주요 경유지 장소명 뒤에 바로 클릭할 수 있게 네이버/카카오 링크 달 것:
+                      [네이버지도](https://map.naver.com/v5/search/{장소명}) | [카카오맵](https://map.kakao.com/link/search/{장소명})
                         """
                     else:
                         prompt += """
-                    [일반 여행 조건]
-                    - 주요 장소명 뒤에 네이버 지도 검색 링크를 달아줘. 예시: [장소명](https://map.naver.com/v5/search/{장소명})
+                    [해외 구글지도 링크 형식]
+                    - 주요 경유지 장소명 뒤에 구글 지도 링크 달 것:
+                      [구글지도 내비](https://www.google.com/maps/search/?api=1&query={장소명})
                         """
 
                     prompt += """
-                    [작성 가이드]
-                    - 모바일 가독성을 위해 일차별 오전/오후/저녁 동선으로 명확히 정리할 것.
-                    - 장소명, 추천 이유, 소요 시간 및 이동 팁을 명확하게 안내할 것.
+                    [출력 형식]
+                    - 글씨가 모바일에서 깔끔하게 보이도록 줄바꿈을 시원하게 할 것.
+                    - 코스, 소요시간, 추천 이유를 보기 쉽게 번호 매겨서 작성할 것.
                     """
                     
                     response = model.generate_content(prompt)
@@ -208,30 +208,26 @@ if not st.session_state.plan_result:
                     st.session_state.destination_saved = destination
                     st.rerun()
                 except Exception as e:
-                    st.error(f"생성 중 오류 발생: {e}")
+                    st.error(f"생성 오류: {e}")
 
 else:
-    st.markdown("### 🗺️ 생성된 맞춤 여행 일정")
+    # 깔끔하고 큼직한 결과 화면
+    st.markdown("### 🗺️ 맞춤 라이딩 일정")
     st.markdown(st.session_state.plan_result)
     
     st.divider()
-    st.subheader("✏️ 일정 수정 및 저장")
     
-    edited_plan = st.text_area("일정 내용 수정", value=st.session_state.plan_result, height=260)
-    
-    try:
+    col1, col2 = st.columns(2)
+    with col1:
         dest_name = st.session_state.get("destination_saved", "맞춤")
-        pdf_bytes = generate_pdf(edited_plan)
+        pdf_bytes = generate_pdf(st.session_state.plan_result)
         st.download_button(
-            label="📄 최종 일정표 PDF 다운로드",
+            label="📄 PDF 다운로드",
             data=pdf_bytes,
-            file_name=f"{dest_name}_맞춤여행일정.pdf",
+            file_name=f"{dest_name}_투어일정.pdf",
             mime="application/pdf"
         )
-    except Exception as e:
-        st.error(f"PDF 생성 오류: {e}")
-        
-    st.write("")
-    if st.button("🔄 조건 다시 설정하기 (처음으로)"):
-        st.session_state.plan_result = ""
-        st.rerun()
+    with col2:
+        if st.button("🔄 처음으로 (새로 만들기)"):
+            st.session_state.plan_result = ""
+            st.rerun()
