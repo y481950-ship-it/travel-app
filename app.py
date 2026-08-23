@@ -17,7 +17,7 @@ st.set_page_config(
     initial_sidebar_state="collapsed"
 )
 
-# 모바일 화면 기본 스타일 (스크롤 차단 CSS 제거 완료)
+# 모바일 UI 스타일링 (스크롤 간섭 완전 제거)
 st.markdown("""
 <style>
     .block-container { 
@@ -93,7 +93,10 @@ API_KEY = "AQ.Ab8RN6KNyTYb9CRCpApOtdKKdV5AhjT07NZ5PVbe7ZSIzCXOPw"
 st.title("🏍️ AI 맞춤 여행 플래너")
 
 with st.expander("📝 여행 조건 입력하기", expanded=True):
-    start_location = st.text_input("출발지 (현재 계신 동네나 도시 입력)", placeholder="예: 서울 강남역, 여주, 수원 등")
+    start_location = st.text_input(
+        "출발지 (현재 계신 동네나 시/군/구 입력)", 
+        placeholder="예: 경기 여주시, 서울 강남, 수원 팔달구 등"
+    )
     destination = st.text_input("목적지 (도착지)", placeholder="예: 영월, 속초, 남해, 양평")
     duration = st.selectbox("여행 기간", ["당일치기", "1박 2일", "2박 3일", "3박 4일"])
     
