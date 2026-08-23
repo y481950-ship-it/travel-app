@@ -7,7 +7,6 @@ from reportlab.lib.pagesizes import A4
 from reportlab.platypus import SimpleDocTemplate, Paragraph, Spacer
 from reportlab.lib.styles import getSampleStyleSheet, ParagraphStyle
 import urllib.request
-import streamlit.components.v1 as components
 
 # 1. 기본 설정
 st.set_page_config(
@@ -15,48 +14,6 @@ st.set_page_config(
     page_icon="🏍️",
     layout="centered"
 )
-
-# 상단 고정 및 스크롤 끼임 방지
-st.markdown("""
-<style>
-    /* 상단 Streamlit 헤더 숨김 */
-    header[data-testid="stHeader"] {
-        display: none !important;
-    }
-    
-    /* 모바일 전체 컨테이너 높이 구속 해제 */
-    html, body, [data-testid="stAppViewContainer"], section.main, .block-container {
-        height: auto !important;
-        min-height: 100vh !important;
-        overflow-y: visible !important;
-    }
-
-    .block-container { 
-        padding-top: 1rem !important; 
-        padding-bottom: 5rem !important; 
-        padding-left: 0.8rem !important; 
-        padding-right: 0.8rem !important; 
-        max-width: 100% !important;
-    }
-    
-    p, span, div, li { 
-        font-size: 1.08rem !important; 
-        line-height: 1.6 !important; 
-    }
-    
-    h1 { font-size: 1.5rem !important; font-weight: bold !important; }
-    h2 { font-size: 1.3rem !important; font-weight: bold !important; color: #1e3d59 !important; }
-    h3 { font-size: 1.15rem !important; font-weight: bold !important; color: #17b978 !important; }
-    
-    .stButton>button { 
-        width: 100% !important; 
-        border-radius: 10px !important; 
-        height: 3.4rem !important; 
-        font-size: 1.15rem !important;
-        font-weight: bold !important; 
-    }
-</style>
-""", unsafe_allow_html=True)
 
 # 2. 한글 폰트 설정 (PDF용)
 FONT_PATH = "NanumGothic.ttf"
@@ -75,7 +32,7 @@ if os.path.exists(FONT_PATH):
 else:
     MAIN_FONT = "Helvetica"
 
-# 3. PDF 생성 함수 (서식 정돈)
+# 3. PDF 생성 함수
 def generate_pdf(text_content):
     buffer = io.BytesIO()
     doc = SimpleDocTemplate(buffer, pagesize=A4, rightMargin=24, leftMargin=24, topMargin=28, bottomMargin=28)
@@ -187,8 +144,7 @@ if not st.session_state.plan_result:
 
                     prompt += """
                     [작성 형식]
-                    - 모바일 화면에서 한눈에 들어오도록 일차별 오전/오후/저녁 동선으로 명확히 정리할 것.
-                    - 코스, 소요 시간, 추천 이유를 깔끔하게 안내할 것.
+                    - 모바일 화면에서 한눈에 들어오도록 일차별(1일차, 2일차...) 또는 섹션별로 명확히 구분해 작성할 것.
                     """
                     
                     response = model.generate_content(prompt)
@@ -199,33 +155,42 @@ if not st.session_state.plan_result:
                     st.error(f"생성 오류: {e}")
 
 else:
-    # 결과 출력 시 화면 맨 위로 즉시 이동
-    components.html("""
-    <script>
-        window.parent.scrollTo(0, 0);
-        const appContainer = window.parent.document.querySelector('[data-testid="stAppViewContainer"]');
-        if (appContainer) {
-            appContainer.scrollTop = 0;
-        }
-    </script>
-    """, height=0, width=0)
-
-    st.markdown("### 🗺️ 생성된 맞춤 여행 일정")
-    st.markdown(st.session_state.plan_result)
-    
-    st.divider()
-    
+    # 1. 상단 컨트롤 버튼 (맨 위에 배치하여 스크롤 안 내려도 바로 작동)
     col1, col2 = st.columns(2)
     with col1:
+        if st.button("🔄 다시 설정하기", use_container_width=True):
+            st.session_state.plan_result = ""
+            st.rerun()
+    with col2:
         dest_name = st.session_state.get("destination_saved", "맞춤")
         pdf_bytes = generate_pdf(st.session_state.plan_result)
         st.download_button(
             label="📄 PDF 다운로드",
             data=pdf_bytes,
             file_name=f"{dest_name}_여행일정.pdf",
-            mime="application/pdf"
+            mime="application/pdf",
+            use_container_width=True
         )
-    with col2:
-        if st.button("🔄 다시 설정하기"):
-            st.session_state.plan_result = ""
-            st.rerun()
+
+    st.markdown("---")
+    
+    # 2. 긴 화면 방지를 위한 탭/섹션 분할 표시
+    content = st.session_state.plan_result
+    
+    # 일정별 분할 처리
+    sections = re.split(r'(?=#\s|\n##\s|\n###\s|\[\d+일차\]|\d+일차)', content)
+    valid_sections = [s.strip() for s in sections if s.strip()]
+
+    if len(valid_sections) > 1:
+        tab_titles = []
+        for idx, sec in enumerate(valid_sections):
+            first_line = sec.split('\n')[0].replace('#', '').strip()
+            tab_titles.append(first_line[:10] if first_line else f"일정 {idx+1}")
+        
+        tabs = st.tabs(tab_titles)
+        for i, tab in enumerate(tabs):
+            with tab:
+                st.markdown(valid_sections[i])
+    else:
+        st.markdown(content)
+        
