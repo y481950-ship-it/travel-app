@@ -3,9 +3,11 @@ import google.generativeai as genai
 import os
 import io
 import re
+import xml.sax.saxutils as saxutils
 from reportlab.lib.pagesizes import A4
-from reportlab.platypus import SimpleDocTemplate, Paragraph, Spacer
+from reportlab.platypus import SimpleDocTemplate, Paragraph, Spacer, Table, TableStyle
 from reportlab.lib.styles import getSampleStyleSheet, ParagraphStyle
+from reportlab.lib import colors
 import urllib.request
 from reportlab.pdfbase import pdfmetrics
 from reportlab.pdfbase.ttfonts import TTFont
@@ -48,7 +50,7 @@ HTML_TEMPLATE = """
         .section-title { font-size: 0.95rem; font-weight: bold; margin: 14px 0 6px 0; color: #222; }
         .radio-group, .checkbox-group { display: flex; flex-wrap: wrap; gap: 6px; margin-bottom: 10px; }
         .radio-group label, .checkbox-group label { background: #f1f3f5; padding: 7px 11px; border-radius: 8px; font-size: 0.9rem; cursor: pointer; display: flex; align-items: center; gap: 5px; }
-        input[type="text"] { width: 100%; padding: 11px; border: 1px solid #ced4da; border-radius: 8px; font-size: 0.95rem; margin-bottom: 10px; }
+        input[type="text"], input[type="number"] { width: 100%; padding: 11px; border: 1px solid #ced4da; border-radius: 8px; font-size: 0.95rem; margin-bottom: 10px; }
         button { width: 100%; padding: 13px; background: #1a73e8; color: #fff; border: none; border-radius: 8px; font-size: 1.05rem; font-weight: bold; cursor: pointer; margin-top: 10px; }
         #loading { display: none; text-align: center; padding: 24px; font-weight: bold; color: #1a73e8; font-size: 1.05rem; }
         #result-area { display: none; margin-top: 16px; }
@@ -58,7 +60,7 @@ HTML_TEMPLATE = """
         .btn-pdf { background: #28a745; }
         .plan-content { background: #fafafa; border: 1px solid #e2e8f0; padding: 14px; border-radius: 8px; font-size: 0.95rem; line-height: 1.6; }
         .plan-content h1 { font-size: 1.25rem; color: #1e3d59; text-align: left; margin: 16px 0 8px; border-bottom: 2px solid #1e3d59; padding-bottom: 4px; }
-        .plan-content h2 { font-size: 1.1rem; color: #0b7285; margin: 12px 0 6px; }
+        .plan-content h2 { font-size: 1.1rem; color: #0b7285; margin: 14px 0 6px; }
         .plan-content h3 { font-size: 1rem; color: #2b8a3e; margin: 10px 0 4px; }
         .plan-content a { color: #1a73e8; font-weight: bold; text-decoration: underline; }
     </style>
@@ -89,11 +91,12 @@ HTML_TEMPLATE = """
 
             <div class="section-title">4. 인원수</div>
             <div class="radio-group">
-                <label><input type="radio" name="headcount" value="1인(솔투)" checked> 👤 1인(솔투)</label>
-                <label><input type="radio" name="headcount" value="2인"> 👥 2인</label>
-                <label><input type="radio" name="headcount" value="3~4인"> 👨‍👩‍👧 3~4인</label>
-                <label><input type="radio" name="headcount" value="5인 이상(단체)"> 🚌 단체</label>
+                <label><input type="radio" name="headcount" value="1명(솔투)" checked onchange="toggleHeadcountInput()"> 👤 1인(솔투)</label>
+                <label><input type="radio" name="headcount" value="2명" onchange="toggleHeadcountInput()"> 👥 2인</label>
+                <label><input type="radio" name="headcount" value="3~4명" onchange="toggleHeadcountInput()"> 👨‍👩‍👧 3~4인</label>
+                <label><input type="radio" name="headcount" value="custom" onchange="toggleHeadcountInput()"> 🚌 단체 (직접 입력)</label>
             </div>
+            <input type="number" id="custom_headcount" placeholder="단체 인원수 입력 (숫자만, 예: 8)" style="display: none;" min="1">
 
             <div class="section-title">5. 여행 기간</div>
             <div class="radio-group">
@@ -133,14 +136,14 @@ HTML_TEMPLATE = """
         <div id="result-area">
             <div class="btn-group">
                 <button class="btn-reset" onclick="resetForm()">🔄 다시 설정하기</button>
-                <button class="btn-pdf" onclick="downloadPdf()">📄 PDF 다운로드</button>
+                <button class="btn-pdf" onclick="downloadPdf()">📄 핵심 견적서 PDF</button>
             </div>
             <div class="plan-content" id="plan-display"></div>
         </div>
     </div>
 
     <script>
-        let rawPlanText = "";
+        let currentPayload = {};
 
         function toggleRegion() {
             const isDomestic = document.querySelector('input[name="region_type"]:checked').value === '국내';
@@ -160,6 +163,11 @@ HTML_TEMPLATE = """
             input.placeholder = '출발지 입력 (예: 서울 강남, 수원)';
         }
 
+        function toggleHeadcountInput() {
+            const isCustom = document.querySelector('input[name="headcount"]:checked').value === 'custom';
+            document.getElementById('custom_headcount').style.display = isCustom ? 'block' : 'none';
+        }
+
         function toggleAvoidRoad() {
             const isBike = document.getElementById('is_bike_mode').checked;
             const avoidLabel = document.getElementById('avoid_road_label');
@@ -177,6 +185,13 @@ HTML_TEMPLATE = """
                 if (!startLocation) { alert('출발지를 입력해주세요.'); return; }
             }
 
+            let headcountVal = document.querySelector('input[name="headcount"]:checked').value;
+            if (headcountVal === 'custom') {
+                const cVal = document.getElementById('custom_headcount').value.trim();
+                if (!cVal || parseInt(cVal) < 1) { alert('정확한 단체 인원수를 입력해주세요.'); return; }
+                headcountVal = `${cVal}명(단체)`;
+            }
+
             const isBike = document.getElementById('is_bike_mode').checked;
             const avoidRoadEl = document.getElementById('avoid_large_roads');
             const avoidLargeRoads = isBike && avoidRoadEl ? avoidRoadEl.checked : false;
@@ -184,14 +199,11 @@ HTML_TEMPLATE = """
             const selectedStyles = Array.from(document.querySelectorAll('input[name="travel_style"]:checked')).map(el => el.value);
             const styleString = selectedStyles.length > 0 ? selectedStyles.join(', ') : '자유 여행';
 
-            document.getElementById('plan-form').style.display = 'none';
-            document.getElementById('loading').style.display = 'block';
-
-            const payload = {
+            currentPayload = {
                 region_type: regionType,
                 start_location: startLocation,
                 destination: destination,
-                headcount: document.querySelector('input[name="headcount"]:checked').value,
+                headcount: headcountVal,
                 duration: document.querySelector('input[name="duration"]:checked').value,
                 include_food: document.getElementById('include_food').checked,
                 include_stay: document.getElementById('include_stay').checked,
@@ -201,11 +213,14 @@ HTML_TEMPLATE = """
                 styles: styleString
             };
 
+            document.getElementById('plan-form').style.display = 'none';
+            document.getElementById('loading').style.display = 'block';
+
             try {
                 const res = await fetch('/generate', {
                     method: 'POST',
                     headers: { 'Content-Type': 'application/json' },
-                    body: JSON.stringify(payload)
+                    body: JSON.stringify(currentPayload)
                 });
                 
                 const text = await res.text();
@@ -224,7 +239,6 @@ HTML_TEMPLATE = """
                     return;
                 }
 
-                rawPlanText = data.raw_text;
                 document.getElementById('plan-display').innerHTML = data.html_text;
                 document.getElementById('loading').style.display = 'none';
                 document.getElementById('result-area').style.display = 'block';
@@ -242,23 +256,18 @@ HTML_TEMPLATE = """
         }
 
         function downloadPdf() {
-            const destination = document.getElementById('destination').value.trim();
             const form = document.createElement('form');
             form.method = 'POST';
             form.action = '/download_pdf';
 
-            const inputDest = document.createElement('input');
-            inputDest.type = 'hidden';
-            inputDest.name = 'destination';
-            inputDest.value = destination;
+            for (const key in currentPayload) {
+                const input = document.createElement('input');
+                input.type = 'hidden';
+                input.name = key;
+                input.value = currentPayload[key];
+                form.appendChild(input);
+            }
 
-            const inputText = document.createElement('input');
-            inputText.type = 'hidden';
-            inputText.name = 'text_content';
-            inputText.value = rawPlanText;
-
-            form.appendChild(inputDest);
-            form.appendChild(inputText);
             document.body.appendChild(form);
             form.submit();
             document.body.removeChild(form);
@@ -290,16 +299,16 @@ def generate():
 
         options = []
         if data.get('include_food'):
-            options.append("- 로컬 맛집: 현지인 추천 노포 2곳과 지도 링크")
+            options.append("- 로컬 맛집: 현지인 추천 찐 맛집/노포 2~3곳과 지도 링크")
         if data.get('include_stay'):
             options.append("- 가성비 숙소: 평점 높은 가성비 숙소 1~2곳과 지도 링크")
         if data.get('include_fishing'):
-            options.append("- 선상 낚시: 바다권일 경우 검증된 선단 정보와 지도 링크")
+            options.append("- 선상 낚시: 바다권일 경우 검증된 선단/선장님 정보와 지도 링크")
 
         options_text = "\n".join(options)
 
         prompt = f"""
-        여행 플래너로서 아래 조건에 맞춰 명확하고 간결한 일정을 작성하세요.
+        당신은 베테랑 여행/라이딩 플래너입니다. 사용자가 화면에서 볼 수 있도록 상세한 여행 코스와 장소 정보를 작성해주세요.
 
         [조건]
         - 지역: {data.get('region_type')} | 출발지: {data.get('start_location')} | 목적지: {data.get('destination')}
@@ -309,20 +318,20 @@ def generate():
         [필수 추천]
         {options_text}
 
-        [규칙]
-        - 출발지 인근 경유지는 제외하고 목적지 방향으로 1시간 주행 후 첫 경유지가 나오게 구성.
+        [주행 규칙]
+        - 출발지 인근 경유지는 제외하고 목적지 방향으로 최소 1시간 주행 후 첫 경유지가 나오게 구성.
         """
 
         if data.get('is_bike_mode'):
             if data.get('region_type') == "국내":
-                prompt += "\n- 고속도로 및 자동차 전용도로 진입 금지."
+                prompt += "\n- 바이크 전용: 고속도로 및 자동차 전용도로 절대 진입 금지."
             if data.get('avoid_large_roads'):
                 prompt += "\n- 4차선 대로 배제, 2차선 지방도/국도 위주."
 
         if data.get('region_type') == "국내":
             prompt += """
         [지도 링크]
-        주요 장소 뒤에 필수 표기: [네이버지도](https://map.naver.com/v5/search/{장소명}) | [카카오맵](https://map.kakao.com/link/search/{장소명})
+        주요 장소명 뒤에 필수 표기: [네이버지도](https://map.naver.com/v5/search/{장소명}) | [카카오맵](https://map.kakao.com/link/search/{장소명})
             """
         else:
             prompt += """
@@ -332,11 +341,11 @@ def generate():
 
         prompt += """
         [출력 양식]
-        # {목적지} 맞춤 여행 일정 ({인원수}, {여행 기간})
-        ## 1. 여행 코스 및 일정
+        # {목적지} 맞춤 여행 코스 및 일정 ({인원수}, {여행 기간})
+        ## 1. 여행 코스 및 세부 일정
         ## 2. 현지 로컬 맛집 & 노포
         ## 3. 가성비 숙소 추천
-        ## 4. 선상 낚시 / 레저 정보
+        ## 4. 선상 낚시 / 추천 액티비티
         ## 5. 여행 & 라이딩 꿀팁
         """
 
@@ -350,84 +359,128 @@ def generate():
 
 @app.route('/download_pdf', methods=['POST'])
 def download_pdf():
-    destination = request.form.get('destination', '맞춤')
-    text_content = request.form.get('text_content', '')
+    try:
+        destination = request.form.get('destination', '맞춤')
+        headcount = request.form.get('headcount', '1명')
+        duration = request.form.get('duration', '당일치기')
+        styles = request.form.get('styles', '자유 여행')
+        region_type = request.form.get('region_type', '국내')
 
-    buffer = io.BytesIO()
-    doc = SimpleDocTemplate(
-        buffer,
-        pagesize=A4,
-        rightMargin=20,
-        leftMargin=20,
-        topMargin=24,
-        bottomMargin=24
-    )
-    
-    styles = getSampleStyleSheet()
-    
-    body_style = ParagraphStyle(
-        name='BodyStyle',
-        fontName=MAIN_FONT,
-        fontSize=9.5,
-        leading=14.5,
-        textColor='#222222',
-        spaceAfter=2
-    )
-    h1_style = ParagraphStyle(
-        name='H1Style',
-        fontName=MAIN_FONT,
-        fontSize=13,
-        leading=17,
-        textColor='#1e3d59',
-        spaceBefore=8,
-        spaceAfter=4,
-        keepWithNext=True
-    )
-    h2_style = ParagraphStyle(
-        name='H2Style',
-        fontName=MAIN_FONT,
-        fontSize=11,
-        leading=15,
-        textColor='#0b7285',
-        spaceBefore=6,
-        spaceAfter=3,
-        keepWithNext=True
-    )
+        genai.configure(api_key=API_KEY)
+        model = genai.GenerativeModel("gemini-3.6-flash")
 
-    story = []
-    lines = text_content.split('\n')
-    
-    for line in lines:
-        line_str = line.strip()
-        if not line_str or line_str == '---':
-            story.append(Spacer(1, 3))
-            continue
+        # PDF 전용 간결한 견적/정보 생성 프롬프트 (경유지 이동 코스 제외)
+        pdf_prompt = f"""
+        여행 정산 및 정보 요약 전문가로서, 아래 조건에 맞춰 PDF 인쇄용 [여행 견적 및 핵심 추천 요약서]를 작성해주세요.
+        *주의: 지루한 경유지나 이동 코스는 완전히 제외하고, 경비 정산표와 핵심 장소(숙소/맛집/체험) 정보만 명확히 작성하세요.*
 
-        line_str = re.sub(
-            r'\[([^\]]+)\]\((https?://[^\)]+)\)',
-            r'<link href="\2" color="#1a73e8"><u>\1</u></link>',
-            line_str
+        [조건]
+        - 목적지: {destination}
+        - 인원: {headcount}
+        - 일정: {duration}
+        - 스타일: {styles}
+
+        [작성 형식]
+        # {destination} 여행 핵심 정보 및 경비 요약서 ({headcount}, {duration})
+
+        ## 1. 예상 경비 견적표
+        - 식비 (1인당 예상): OOO원
+        - 숙박비 (1인당 예상): OOO원 (당일치기인 경우 0원)
+        - 액티비티/선상낚시/체험 (1인당 예상): OOO원
+        - 유류비/교통비 (1인당 예상): OOO원
+        - [1인당 총 예상 경비]: OOO원
+        - [{headcount} 전체 총 예상 경비]: OOO원
+
+        ## 2. 엄선 로컬 맛집
+        - [식당명]: 대표메뉴 및 특징, 1인당 예상 가격
+
+        ## 3. 추천 가성비 숙소 (당일치기면 생략 또는 주변 쉼터)
+        - [숙소명]: 객실 특징, 가성비 포인트, 예상 1박 요금
+
+        ## 4. 추천 액티비티 & 선상 낚시
+        - [프로그램/선단명]: 특징, 소요시간, 1인 체험비
+        """
+
+        res = model.generate_content(pdf_prompt)
+        pdf_text = res.text
+
+        buffer = io.BytesIO()
+        doc = SimpleDocTemplate(
+            buffer,
+            pagesize=A4,
+            rightMargin=28,
+            leftMargin=28,
+            topMargin=30,
+            bottomMargin=30
         )
-        line_str = re.sub(r'\*\*(.*?)\*\*', r'<b>\1</b>', line_str)
 
-        if line_str.startswith('# '):
-            story.append(Paragraph(line_str.replace('# ', '').strip(), h1_style))
-        elif line_str.startswith('## '):
-            story.append(Paragraph(line_str.replace('## ', '').strip(), h2_style))
-        elif line_str.startswith('### '):
-            story.append(Paragraph(line_str.replace('### ', '').strip(), h2_style))
-        else:
-            story.append(Paragraph(line_str, body_style))
+        styles_set = getSampleStyleSheet()
 
-    doc.build(story)
-    buffer.seek(0)
+        body_style = ParagraphStyle(
+            name='PdfBody',
+            fontName=MAIN_FONT,
+            fontSize=10,
+            leading=15,
+            textColor=colors.HexColor('#222222'),
+            spaceAfter=4
+        )
+        h1_style = ParagraphStyle(
+            name='PdfH1',
+            fontName=MAIN_FONT,
+            fontSize=14,
+            leading=18,
+            textColor=colors.HexColor('#1e3d59'),
+            spaceBefore=10,
+            spaceAfter=6,
+            keepWithNext=True
+        )
+        h2_style = ParagraphStyle(
+            name='PdfH2',
+            fontName=MAIN_FONT,
+            fontSize=11.5,
+            leading=16,
+            textColor=colors.HexColor('#0b7285'),
+            spaceBefore=8,
+            spaceAfter=4,
+            keepWithNext=True
+        )
 
-    return send_file(
-        buffer,
-        as_attachment=True,
-        download_name=f"{destination}_여행일정.pdf",
-        mimetype="application/pdf"
-    )
+        story = []
+        lines = pdf_text.split('\n')
+
+        for line in lines:
+            line_str = line.strip()
+            if not line_str or line_str.startswith('---'):
+                story.append(Spacer(1, 4))
+                continue
+
+            # XML 특수문자 안전 이스케이프 후 볼드 복원
+            safe_text = saxutils.escape(line_str)
+            safe_text = re.sub(r'\*\*(.*?)\*\*', r'<b>\1</b>', safe_text)
+
+            if line_str.startswith('# '):
+                clean_h1 = re.sub(r'^#\s*', '', safe_text)
+                story.append(Paragraph(clean_h1, h1_style))
+            elif line_str.startswith('## '):
+                clean_h2 = re.sub(r'^##\s*', '', safe_text)
+                story.append(Paragraph(clean_h2, h2_style))
+            elif line_str.startswith('### '):
+                clean_h3 = re.sub(r'^###\s*', '', safe_text)
+                story.append(Paragraph(clean_h3, h2_style))
+            else:
+                story.append(Paragraph(safe_text, body_style))
+
+        doc.build(story)
+        buffer.seek(0)
+
+        return send_file(
+            buffer,
+            as_attachment=True,
+            download_name=f"{destination}_여행견적서.pdf",
+            mimetype="application/pdf"
+        )
+    except Exception as e:
+        return f"PDF 생성 중 오류 발생: {str(e)}", 500
 
 if __name__ == '__main__':
     app.run(host='0.0.0.0', port=5000)
