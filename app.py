@@ -18,22 +18,21 @@ st.set_page_config(
     initial_sidebar_state="collapsed"
 )
 
-# 화면 꺼짐 복귀 시 500 에러 방지 (강력한 자동 세션 복구 스크립트)
+# 화면 꺼짐 복귀 시 500 에러 방지 및 당겨서 새로고침 강제 방지
 components.html(
     """
     <script>
-    // 스마트폰 화면 복귀 시 끊어진 연결을 즉시 복구
+    // 스마트폰 브라우저 당겨서 새로고침(Pull-to-refresh) 차단
+    document.body.style.overscrollBehaviorY = 'contain';
+    document.documentElement.style.overscrollBehaviorY = 'contain';
+
+    // 화면 복귀 시 세션 재연결
     document.addEventListener("visibilitychange", function() {
         if (document.visibilityState === 'visible') {
             window.dispatchEvent(new Event('resize'));
-            // 웹소켓 연결이 끊어져 500 오류가 뜨는 것을 방지하기 위해 가벼운 핑 전송
-            if (window.parent) {
-                window.parent.postMessage({type: 'streamlit:keepAlive'}, '*');
-            }
         }
     });
 
-    // 화면 포커스 획득 시 세션 재연결
     window.addEventListener("focus", function() {
         window.dispatchEvent(new Event('resize'));
     });
@@ -43,9 +42,15 @@ components.html(
     width=0
 )
 
-# 모바일 UI 스타일링
+# 모바일 UI 스타일링 + 당겨서 새로고침 방지 CSS
 st.markdown("""
 <style>
+    /* 브라우저 상단 당겨서 새로고침 방지 */
+    html, body, [data-testid="stAppViewContainer"], .main {
+        overscroll-behavior-y: contain !important;
+        overscroll-behavior: contain !important;
+    }
+    
     .block-container { 
         padding-top: 1rem !important; 
         padding-bottom: 3rem !important; 
