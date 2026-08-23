@@ -12,7 +12,7 @@ from reportlab.pdfbase.ttfonts import TTFont
 
 app = Flask(__name__)
 
-# 한글 폰트 다운로드 및 등록
+# 한글 폰트 설정
 FONT_PATH = "NanumGothic.ttf"
 if not os.path.exists(FONT_PATH):
     try:
@@ -46,7 +46,6 @@ HTML_TEMPLATE = """
         .radio-group label, .checkbox-group label { background: #f1f3f5; padding: 8px 12px; border-radius: 8px; font-size: 0.95rem; cursor: pointer; display: flex; align-items: center; gap: 6px; }
         input[type="text"] { width: 100%; padding: 12px; border: 1px solid #ced4da; border-radius: 8px; font-size: 1rem; margin-bottom: 12px; }
         button { width: 100%; padding: 14px; background: #1a73e8; color: #fff; border: none; border-radius: 8px; font-size: 1.1rem; font-weight: bold; cursor: pointer; margin-top: 10px; }
-        button:disabled { background: #aaa; }
         #loading { display: none; text-align: center; padding: 20px; font-weight: bold; color: #1a73e8; }
         #result-area { display: none; margin-top: 20px; }
         .btn-group { display: flex; gap: 10px; margin-bottom: 15px; }
@@ -82,7 +81,7 @@ HTML_TEMPLATE = """
             <input type="text" id="start_location" placeholder="출발지 입력" style="display: none;">
             
             <div class="section-title">목적지</div>
-            <input type="text" id="destination" placeholder="예: 영월, 속초, 후쿠오카" required>
+            <input type="text" id="destination" placeholder="예: 영월, 속초, 낙산사" required>
 
             <div class="section-title">여행 기간</div>
             <div class="radio-group">
@@ -182,8 +181,8 @@ HTML_TEMPLATE = """
                 });
                 const data = await res.json();
                 
-                if (data.error) {
-                    alert('생성 오류: ' + data.error);
+                if (!res.ok || data.error) {
+                    alert('생성 오류가 발생했습니다: ' + (data.error || '응답 없음'));
                     resetForm();
                     return;
                 }
@@ -194,7 +193,7 @@ HTML_TEMPLATE = """
                 document.getElementById('result-area').style.display = 'block';
                 window.scrollTo({ top: 0, behavior: 'smooth' });
             } catch (err) {
-                alert('서버 통신 오류가 발생했습니다.');
+                alert('서버 응답 오류가 발생했습니다. 잠시 후 다시 시도해주세요.');
                 resetForm();
             }
         }
@@ -250,10 +249,10 @@ def generate():
     data = request.json
     try:
         genai.configure(api_key=API_KEY)
-        model = genai.GenerativeModel("gemini-3.6-flash")
+        model = genai.GenerativeModel("gemini-2.5-flash")
 
         prompt = f"""
-        다음 조건으로 여행/라이딩 일정을 작성해줘.
+        다음 조건으로 간결하고 명확한 여행/라이딩 일정을 작성해줘.
         - 지역: {data['region_type']}
         - 출발지: {data['start_location']}
         - 목적지: {data['destination']}
@@ -261,37 +260,26 @@ def generate():
         - 스타일: {data['style']}
         - 추가 요청: {data['extra_requests']}
 
-        [🚫 출발지 인근 경유지 절대 배제 규칙]
-        - 출발지 내부 또는 인근의 관광지/카페는 첫 경유지로 잡지 말 것.
-        - 출발지에서 목적지 방향으로 최소 1시간 이상 이동/주행한 후 첫 경유지 및 휴식지가 나오도록 할 것.
+        [규칙]
+        - 출발지 인근 경유지는 배제하고 목적지 방향으로 최소 1시간 주행 후 첫 경유지가 나오게 할 것.
         """
 
         if data.get('is_bike_mode'):
             if data['region_type'] == "국내":
-                prompt += "\n- 고속도로 및 자동차 전용도로 진입 금지 (이륜차 통행 금지 도로 절대 배제)."
+                prompt += "\n- 고속도로 및 자동차 전용도로 진입 금지."
             if data.get('avoid_large_roads'):
-                prompt += "\n- [4차선 대로 완전 배제]: 4차선 이상 넓은 도로는 완전히 제외하고, 1.5~2차선 한적한 시골길/산길 와인딩 지방도로만 연결할 것."
-            else:
-                prompt += "\n- [일반 도로 허용]: 빠른 이동과 주행 편의를 위해 4차선 일반 국도 및 주요 도로 주행을 적극 포함할 것."
+                prompt += "\n- 4차선 대로 배제, 한적한 2차선 지방도/국도 위주 코스."
 
         if data['region_type'] == "국내":
             prompt += """
-        [국내 지도 링크 규칙]
-        - 주요 경유지 장소명 뒤에 아래 형식으로 네이버/카카오 지도 링크 작성:
-          [네이버지도](https://map.naver.com/v5/search/{장소명}) | [카카오맵](https://map.kakao.com/link/search/{장소명})
+        [지도 링크]
+        - 경유지 장소명 뒤에 링크 표기: [네이버지도](https://map.naver.com/v5/search/{장소명}) | [카카오맵](https://map.kakao.com/link/search/{장소명})
             """
         else:
             prompt += """
-        [해외 지도 링크 규칙]
-        - 주요 경유지 장소명 뒤에 아래 형식으로 구글 지도 링크 작성:
-          [구글지도 내비](https://www.google.com/maps/search/?api=1&query={장소명})
+        [해외 지도 링크]
+        - 경유지 장소명 뒤에 링크 표기: [구글지도](https://www.google.com/maps/search/?api=1&query={장소명})
             """
-
-        prompt += """
-        [작성 형식]
-        - 모바일 화면에서 한눈에 들어오도록 일차별 오전/오후/저녁 동선으로 명확히 정리할 것.
-        - 코스, 소요 시간, 추천 이유를 깔끔하게 안내할 것.
-        """
 
         response = model.generate_content(prompt)
         raw_text = response.text
