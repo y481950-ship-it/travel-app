@@ -9,7 +9,7 @@ from reportlab.lib.styles import getSampleStyleSheet, ParagraphStyle
 from reportlab.pdfgen import canvas
 import urllib.request
 
-# 1. 모바일 뷰포트 및 반응형 레이아웃 설정
+# 1. 모바일 뷰포트 및 레이아웃 설정
 st.set_page_config(
     page_title="AI 여행 플래너",
     page_icon="🏍️",
@@ -17,29 +17,22 @@ st.set_page_config(
     initial_sidebar_state="collapsed"
 )
 
-# 모바일 화면 이탈 및 당겨서 새로고침(Pull-to-refresh) 완벽 차단 CSS
+# 모바일 화면 기본 스타일 (스크롤 차단 CSS 제거 완료)
 st.markdown("""
 <style>
-    /* 화면 위/아래 바운스 및 당겨서 새로고침 방지 */
-    html, body, [data-testid="stAppViewContainer"] {
-        overscroll-behavior-y: contain !important;
-        overscroll-behavior-x: none !important;
-        -webkit-overflow-scrolling: touch;
-    }
-    
     .block-container { 
-        padding: 1.5rem 1rem 3rem 1rem !important; 
+        padding-top: 1.5rem !important; 
+        padding-bottom: 3rem !important; 
+        padding-left: 1rem !important; 
+        padding-right: 1rem !important; 
     }
-    
     h1, h2, h3 { 
         font-size: 1.4rem !important; 
         line-height: 1.3 !important; 
     }
-    
     p, div, label { 
         font-size: 0.95rem !important; 
     }
-    
     .stButton>button { 
         width: 100% !important; 
         border-radius: 8px !important; 
@@ -97,31 +90,24 @@ def generate_pdf(text_content):
 API_KEY = "AQ.Ab8RN6KNyTYb9CRCpApOtdKKdV5AhjT07NZ5PVbe7ZSIzCXOPw"
 
 # 5. 화면 구성
-st.title("📱 AI 맞춤 여행 플래너")
+st.title("🏍️ AI 맞춤 여행 플래너")
 
 with st.expander("📝 여행 조건 입력하기", expanded=True):
-    start_mode = st.radio("출발지 선택 방식", ["직접 입력", "현재 내 위치 (자동 기준)"], horizontal=True)
-    
-    if start_mode == "직접 입력":
-        start_location = st.text_input("출발지", placeholder="예: 서울 강남, 수원, 대전")
-    else:
-        start_location = "현재 위치(사용자 위치 기준)"
-        st.info("📍 출발지가 '현재 계신 위치 기준'으로 자동 지정되어 경로가 생성됩니다.")
-
-    destination = st.text_input("목적지 (여행지)", placeholder="예: 영월, 속초, 남해")
+    start_location = st.text_input("출발지 (현재 계신 동네나 도시 입력)", placeholder="예: 서울 강남역, 여주, 수원 등")
+    destination = st.text_input("목적지 (도착지)", placeholder="예: 영월, 속초, 남해, 양평")
     duration = st.selectbox("여행 기간", ["당일치기", "1박 2일", "2박 3일", "3박 4일"])
     
     # 바이크 전용 모드
     is_bike_mode = st.checkbox("🏍️ 바이크 투어 모드 (라이딩 전용 경로)", value=True)
     
     style = st.selectbox("여행 스타일", ["자연/풍경 감상", "맛집/카페 투어", "관광지 위주", "액티비티/체험", "휴양/힐링"])
-    extra_requests = st.text_input("기타 요청사항", placeholder="예: 해산물 위주 맛집 추천해줘")
+    extra_requests = st.text_input("기타 요청사항", placeholder="예: 한적한 와인딩 코스, 뷰 맛집 위주")
 
 if "plan_result" not in st.session_state:
     st.session_state.plan_result = ""
 
 if st.button("🚀 맞춤 여행 일정 만들기"):
-    if not destination or (start_mode == "직접 입력" and not start_location):
+    if not start_location or not destination:
         st.warning("출발지와 목적지를 모두 입력해주세요.")
     else:
         with st.spinner("최적의 맞춤 일정을 생성하는 중..."):
