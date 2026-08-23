@@ -37,6 +37,7 @@ HTML_TEMPLATE = """
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
     <title>박영선의 AI 맞춤 여행 플래너</title>
     
+    <!-- 모바일 전용 앱 아이콘 -->
     <link rel="apple-touch-icon" sizes="180x180" href="https://cdn-icons-png.flaticon.com/512/854/854878.png">
     <link rel="icon" type="image/png" sizes="192x192" href="https://cdn-icons-png.flaticon.com/512/854/854878.png">
     <link rel="icon" type="image/png" sizes="32x32" href="https://cdn-icons-png.flaticon.com/512/854/854878.png">
@@ -111,22 +112,20 @@ HTML_TEMPLATE = """
                 <label><input type="checkbox" id="include_fishing" checked> 🎣 선상 낚시(베테랑 선장)</label>
             </div>
 
-            <div class="section-title">7. 경로 설정</div>
+            <div class="section-title">7. 여행 스타일 (중복 선택 가능)</div>
+            <div class="checkbox-group">
+                <label><input type="checkbox" name="travel_style" value="자연/풍경 감상" checked> 🏞️ 자연/풍경</label>
+                <label><input type="checkbox" name="travel_style" value="맛집/카페 투어" checked> ☕ 맛집/카페</label>
+                <label><input type="checkbox" name="travel_style" value="관광지/명소 탐방"> 🏛️ 관광지 탐방</label>
+                <label><input type="checkbox" name="travel_style" value="휴양/힐링"> 🧘 휴양/힐링</label>
+                <label><input type="checkbox" name="travel_style" value="이색 액티비티/체험"> 🏄 액티비티/체험</label>
+            </div>
+
+            <div class="section-title">8. 경로 설정</div>
             <div class="checkbox-group">
                 <label><input type="checkbox" id="is_bike_mode" checked onchange="toggleAvoidRoad()"> 🏍️ 바이크 전용 경로</label>
                 <label id="avoid_road_label"><input type="checkbox" id="avoid_large_roads" checked> 🚜 4차선 대로 완전 배제</label>
             </div>
-
-            <div class="section-title">8. 여행 스타일</div>
-            <div class="radio-group">
-                <label><input type="radio" name="style" value="자연/풍경 감상" checked> 자연/풍경</label>
-                <label><input type="radio" name="style" value="맛집/카페 투어"> 맛집/카페</label>
-                <label><input type="radio" name="style" value="관광지 위주"> 관광지</label>
-                <label><input type="radio" name="style" value="휴양/힐링"> 휴양/힐링</label>
-            </div>
-
-            <div class="section-title">9. 기타 요청사항</div>
-            <input type="text" id="extra_requests" placeholder="예: 한적한 와인딩, 뷰 좋은 곳 등">
 
             <button type="button" id="submit-btn" onclick="generatePlan()">🚀 맞춤 일정 생성하기</button>
         </form>
@@ -183,6 +182,10 @@ HTML_TEMPLATE = """
             const avoidRoadEl = document.getElementById('avoid_large_roads');
             const avoidLargeRoads = isBike && avoidRoadEl ? avoidRoadEl.checked : false;
 
+            // 선택된 여행 스타일 수집
+            const selectedStyles = Array.from(document.querySelectorAll('input[name="travel_style"]:checked')).map(el => el.value);
+            const styleString = selectedStyles.length > 0 ? selectedStyles.join(', ') : '자유 여행';
+
             document.getElementById('plan-form').style.display = 'none';
             document.getElementById('loading').style.display = 'block';
 
@@ -197,8 +200,7 @@ HTML_TEMPLATE = """
                 include_fishing: document.getElementById('include_fishing').checked,
                 is_bike_mode: isBike,
                 avoid_large_roads: avoidLargeRoads,
-                style: document.querySelector('input[name="style"]:checked').value,
-                extra_requests: document.getElementById('extra_requests').value.trim()
+                styles: styleString
             };
 
             try {
@@ -290,30 +292,30 @@ def generate():
         options_text = "\n".join(options)
 
         prompt = f"""
-        당신은 베테랑 여행/라이딩 플래너입니다. 아래 조건에 맞는 맞춤 일정을 핵심 위주로 명확하게 작성해주세요.
+        당신은 대한민국 최고 수준의 베테랑 여행/라이딩 플래너입니다. 아래 선택된 스타일에 맞춰 여행 일정을 완벽히 조화롭게 구성해주세요.
 
         [조건]
         - 지역: {data['region_type']} | 출발지: {data['start_location']} | 목적지: {data['destination']}
-        - 인원: {data['headcount']} | 일정: {data['duration']} | 스타일: {data['style']}
-        - 요청사항: {data['extra_requests']}
+        - 인원: {data['headcount']} | 일정: {data['duration']}
+        - 선택된 여행 스타일: {data['styles']} (이 스타일들이 일정 중에 골고루 반영되어야 함)
 
-        [포함 항목]
+        [추천 필수 항목]
         {options_text}
 
-        [주행 규칙]
-        - 출발지 인근 경유지는 제외하고 목적지 방향으로 1시간 주행 후 첫 경유지가 나오게 구성할 것.
+        [주행 및 일정 규칙]
+        - 출발지 인근 경유지는 제외하고 목적지 방향으로 최소 1시간 이상 주행 후 첫 경유지가 나오도록 구성.
         """
 
         if data.get('is_bike_mode'):
             if data['region_type'] == "국내":
-                prompt += "\n- 고속도로 및 자동차 전용도로 절대 진입 금지."
+                prompt += "\n- 바이크 전용: 고속도로 및 자동차 전용도로 절대 진입 금지."
             if data.get('avoid_large_roads'):
-                prompt += "\n- 4차선 대로 배제, 2차선 지방도/국도 위주."
+                prompt += "\n- 4차선 대로 배제, 한적한 2차선 지방도/국도 위주 코스."
 
         if data['region_type'] == "국내":
             prompt += """
         [지도 링크 규칙]
-        주요 장소(식당, 숙소, 경유지, 출항지) 뒤에 반드시 아래 형식으로 링크 작성:
+        주요 장소(식당, 숙소, 체험장, 경유지, 출항지) 뒤에 반드시 아래 형식으로 링크 작성:
         [네이버지도](https://map.naver.com/v5/search/{장소명}) | [카카오맵](https://map.kakao.com/link/search/{장소명})
             """
         else:
