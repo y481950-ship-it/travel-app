@@ -8,7 +8,6 @@ from reportlab.platypus import SimpleDocTemplate, Paragraph, Spacer
 from reportlab.lib.styles import getSampleStyleSheet, ParagraphStyle
 import urllib.request
 
-# 1. 모바일 뷰포트 및 기본 설정
 st.set_page_config(
     page_title="박영선의 AI 여행 플래너",
     page_icon="🏍️",
@@ -16,23 +15,30 @@ st.set_page_config(
     initial_sidebar_state="collapsed"
 )
 
-# 모바일 새로고침 원천 차단 + 완벽한 상하 터치 스크롤 CSS
 st.markdown("""
 <style>
-    /* 1. 최상단 당겨서 새로고침(Pull-to-refresh) 완벽 차단 */
-    html, body, .stApp, section.main, [data-testid="stAppViewContainer"] {
-        overscroll-behavior-y: contain !important;
-        overscroll-behavior: contain !important;
+    /* 전체 브라우저 바깥 틀 고정 및 당겨서 새로고침 원천 차단 */
+    html, body, [data-testid="stAppViewContainer"] {
+        width: 100% !important;
+        height: 100% !important;
+        overflow: hidden !important;
+        overscroll-behavior: none !important;
+        position: fixed !important;
+    }
+
+    /* 내부 전체를 감싸는 독립 스크롤 컨테이너 박스 생성 */
+    .main {
+        position: fixed !important;
+        top: 0 !important;
+        left: 0 !important;
+        right: 0 !important;
+        bottom: 0 !important;
+        overflow-y: auto !important;
         -webkit-overflow-scrolling: touch !important;
+        overscroll-behavior-y: none !important;
         touch-action: pan-y !important;
     }
-    
-    /* 2. 메인 스크롤 영역 부드럽게 유지 */
-    section.main {
-        overflow-y: auto !important;
-    }
-    
-    /* 3. 모바일 여백 및 레이아웃 */
+
     .block-container { 
         padding-top: 1.2rem !important; 
         padding-bottom: 6rem !important; 
@@ -40,7 +46,6 @@ st.markdown("""
         padding-right: 1rem !important; 
     }
     
-    /* 4. 본문 및 제목 가독성 최적화 */
     p, span, div, li { 
         font-size: 1.1rem !important; 
         line-height: 1.6 !important; 
@@ -50,14 +55,12 @@ st.markdown("""
     h2 { font-size: 1.35rem !important; font-weight: bold !important; color: #1e3d59 !important; }
     h3 { font-size: 1.2rem !important; font-weight: bold !important; color: #17b978 !important; }
     
-    /* 5. 지도 링크 가시성 확보 */
     a {
         font-size: 1.1rem !important;
         font-weight: bold !important;
         text-decoration: underline !important;
     }
     
-    /* 6. 터치 버튼 최적화 */
     .stButton>button { 
         width: 100% !important; 
         border-radius: 10px !important; 
@@ -72,7 +75,6 @@ st.markdown("""
 </style>
 """, unsafe_allow_html=True)
 
-# 2. 한글 폰트 설정 (PDF용)
 FONT_PATH = "NanumGothic.ttf"
 if not os.path.exists(FONT_PATH):
     try:
@@ -89,7 +91,6 @@ if os.path.exists(FONT_PATH):
 else:
     MAIN_FONT = "Helvetica"
 
-# 3. PDF 생성 함수
 def generate_pdf(text_content):
     buffer = io.BytesIO()
     doc = SimpleDocTemplate(buffer, pagesize=A4, rightMargin=25, leftMargin=25, topMargin=30, bottomMargin=30)
