@@ -35,43 +35,43 @@ HTML_TEMPLATE = """
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
-    <title>박영선의 AI 여행 플래너</title>
+    <title>박영선의 AI 맞춤 여행 플래너</title>
     <style>
         * { box-sizing: border-box; margin: 0; padding: 0; }
-        body { font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif; background-color: #f8f9fa; color: #333; padding: 16px; font-size: 16px; line-height: 1.6; }
-        .container { max-width: 600px; margin: 0 auto; background: #fff; padding: 20px; border-radius: 12px; box-shadow: 0 2px 8px rgba(0,0,0,0.08); }
-        h1 { font-size: 1.4rem; color: #1e3d59; margin-bottom: 20px; text-align: center; }
-        .section-title { font-size: 1rem; font-weight: bold; margin: 15px 0 8px 0; color: #222; }
-        .radio-group, .checkbox-group { display: flex; flex-wrap: wrap; gap: 8px; margin-bottom: 12px; }
-        .radio-group label, .checkbox-group label { background: #f1f3f5; padding: 8px 12px; border-radius: 8px; font-size: 0.95rem; cursor: pointer; display: flex; align-items: center; gap: 6px; }
-        input[type="text"] { width: 100%; padding: 12px; border: 1px solid #ced4da; border-radius: 8px; font-size: 1rem; margin-bottom: 12px; }
-        button { width: 100%; padding: 14px; background: #1a73e8; color: #fff; border: none; border-radius: 8px; font-size: 1.1rem; font-weight: bold; cursor: pointer; margin-top: 10px; }
-        #loading { display: none; text-align: center; padding: 20px; font-weight: bold; color: #1a73e8; }
-        #result-area { display: none; margin-top: 20px; }
-        .btn-group { display: flex; gap: 10px; margin-bottom: 15px; }
+        body { font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif; background-color: #f4f6f9; color: #333; padding: 14px; font-size: 15px; line-height: 1.5; }
+        .container { max-width: 600px; margin: 0 auto; background: #fff; padding: 20px; border-radius: 12px; box-shadow: 0 2px 10px rgba(0,0,0,0.08); }
+        h1 { font-size: 1.35rem; color: #1e3d59; margin-bottom: 18px; text-align: center; font-weight: bold; }
+        .section-title { font-size: 0.95rem; font-weight: bold; margin: 14px 0 6px 0; color: #222; }
+        .radio-group, .checkbox-group { display: flex; flex-wrap: wrap; gap: 6px; margin-bottom: 10px; }
+        .radio-group label, .checkbox-group label { background: #f1f3f5; padding: 7px 11px; border-radius: 8px; font-size: 0.9rem; cursor: pointer; display: flex; align-items: center; gap: 5px; }
+        input[type="text"] { width: 100%; padding: 11px; border: 1px solid #ced4da; border-radius: 8px; font-size: 0.95rem; margin-bottom: 10px; }
+        button { width: 100%; padding: 13px; background: #1a73e8; color: #fff; border: none; border-radius: 8px; font-size: 1.05rem; font-weight: bold; cursor: pointer; margin-top: 10px; }
+        #loading { display: none; text-align: center; padding: 24px; font-weight: bold; color: #1a73e8; font-size: 1.05rem; }
+        #result-area { display: none; margin-top: 16px; }
+        .btn-group { display: flex; gap: 8px; margin-bottom: 14px; }
         .btn-group button { margin-top: 0; }
         .btn-reset { background: #6c757d; }
         .btn-pdf { background: #28a745; }
-        .plan-content { background: #fdfdfd; border: 1px solid #e9ecef; padding: 16px; border-radius: 8px; font-size: 1.05rem; }
-        .plan-content h1 { font-size: 1.3rem; color: #111; text-align: left; margin: 15px 0 8px; }
-        .plan-content h2 { font-size: 1.15rem; color: #1e3d59; margin: 12px 0 6px; }
-        .plan-content h3 { font-size: 1.05rem; color: #17b978; margin: 10px 0 4px; }
+        .plan-content { background: #fafafa; border: 1px solid #e2e8f0; padding: 14px; border-radius: 8px; font-size: 0.95rem; line-height: 1.6; }
+        .plan-content h1 { font-size: 1.25rem; color: #1e3d59; text-align: left; margin: 16px 0 8px; border-bottom: 2px solid #1e3d59; padding-bottom: 4px; }
+        .plan-content h2 { font-size: 1.1rem; color: #0b7285; margin: 12px 0 6px; }
+        .plan-content h3 { font-size: 1rem; color: #2b8a3e; margin: 10px 0 4px; }
         .plan-content a { color: #1a73e8; font-weight: bold; text-decoration: underline; }
     </style>
 </head>
 <body>
     <div class="container">
-        <h1>🏍️ 박영선의 AI 여행 플래너</h1>
+        <h1>🏍️ 박영선의 AI 맞춤 여행 플래너</h1>
         
         <form id="plan-form">
-            <div class="section-title">지역 구분</div>
+            <div class="section-title">1. 지역 구분</div>
             <div class="radio-group">
                 <label><input type="radio" name="region_type" value="국내" checked onchange="toggleRegion()"> 🇰🇷 국내</label>
                 <label><input type="radio" name="region_type" value="해외" onchange="toggleRegion()"> ✈️ 해외</label>
             </div>
 
             <div id="domestic-start">
-                <div class="section-title">출발지 설정</div>
+                <div class="section-title">2. 출발지 설정</div>
                 <div class="radio-group">
                     <label><input type="radio" name="start_mode" value="default" checked onchange="toggleStartInput()"> 📍 현재 위치 (경기 여주)</label>
                     <label><input type="radio" name="start_mode" value="custom" onchange="toggleStartInput()"> ✏️ 직접 입력</label>
@@ -80,24 +80,39 @@ HTML_TEMPLATE = """
 
             <input type="text" id="start_location" placeholder="출발지 입력" style="display: none;">
             
-            <div class="section-title">목적지</div>
-            <input type="text" id="destination" placeholder="예: 영월, 속초, 낙산사" required>
+            <div class="section-title">3. 목적지</div>
+            <input type="text" id="destination" placeholder="예: 영월, 속초, 삼척, 낙산사" required>
 
-            <div class="section-title">여행 기간</div>
+            <div class="section-title">4. 인원수</div>
+            <div class="radio-group">
+                <label><input type="radio" name="headcount" value="1명(솔로 투어)" checked> 👤 1인(솔투)</label>
+                <label><input type="radio" name="headcount" value="2명(듀오)"> 👥 2인</label>
+                <label><input type="radio" name="headcount" value="3~4명(소그룹)"> 👨‍👩‍👧 3~4인</label>
+                <label><input type="radio" name="headcount" value="5인 이상(단체)"> 🚌 단체</label>
+            </div>
+
+            <div class="section-title">5. 여행 기간</div>
             <div class="radio-group">
                 <label><input type="radio" name="duration" value="당일치기" checked> 당일치기</label>
                 <label><input type="radio" name="duration" value="1박 2일"> 1박 2일</label>
                 <label><input type="radio" name="duration" value="2박 3일"> 2박 3일</label>
-                <label><input type="radio" name="duration" value="3박 4일"> 3박 4일</label>
-                <label><input type="radio" name="duration" value="4박 5일 이상"> 4박 5일 이상</label>
+                <label><input type="radio" name="duration" value="3박 4일 이상"> 3박 4일 이상</label>
             </div>
 
+            <div class="section-title">6. 필수 포함 추천 옵션</div>
+            <div class="checkbox-group">
+                <label><input type="checkbox" id="include_food" checked> 🍲 로컬 맛집/노포</label>
+                <label><input type="checkbox" id="include_stay" checked> 🛏️ 가성비 숙소(호텔/펜션)</label>
+                <label><input type="checkbox" id="include_fishing" checked> 🎣 선상 낚시(베테랑 선장)</label>
+            </div>
+
+            <div class="section-title">7. 경로 설정</div>
             <div class="checkbox-group">
                 <label><input type="checkbox" id="is_bike_mode" checked onchange="toggleAvoidRoad()"> 🏍️ 바이크 전용 경로</label>
                 <label id="avoid_road_label"><input type="checkbox" id="avoid_large_roads" checked> 🚜 4차선 대로 완전 배제</label>
             </div>
 
-            <div class="section-title">여행 스타일</div>
+            <div class="section-title">8. 여행 스타일</div>
             <div class="radio-group">
                 <label><input type="radio" name="style" value="자연/풍경 감상" checked> 자연/풍경</label>
                 <label><input type="radio" name="style" value="맛집/카페 투어"> 맛집/카페</label>
@@ -105,13 +120,13 @@ HTML_TEMPLATE = """
                 <label><input type="radio" name="style" value="휴양/힐링"> 휴양/힐링</label>
             </div>
 
-            <div class="section-title">기타 요청사항</div>
-            <input type="text" id="extra_requests" placeholder="예: 한적한 와인딩 코스, 뷰 맛집 위주">
+            <div class="section-title">9. 기타 요청사항</div>
+            <input type="text" id="extra_requests" placeholder="예: 한적한 와인딩, 뷰 좋은 곳, 특정 어종 낚시 등">
 
-            <button type="button" id="submit-btn" onclick="generatePlan()">🚀 일정 생성하기</button>
+            <button type="button" id="submit-btn" onclick="generatePlan()">🚀 맞춤 일정 생성하기</button>
         </form>
 
-        <div id="loading">⏳ 최적의 여행 코스를 구성하고 있습니다...</div>
+        <div id="loading">⏳ 최적의 여행 코스와 추천 정보를 구성하고 있습니다...</div>
 
         <div id="result-area">
             <div class="btn-group">
@@ -130,7 +145,7 @@ HTML_TEMPLATE = """
             document.getElementById('domestic-start').style.display = isDomestic ? 'block' : 'none';
             if (!isDomestic) {
                 document.getElementById('start_location').style.display = 'block';
-                document.getElementById('start_location').placeholder = '출발지 (공항/항구/도시 입력)';
+                document.getElementById('start_location').placeholder = '출발지 (공항/도시 입력)';
             } else {
                 toggleStartInput();
             }
@@ -166,7 +181,11 @@ HTML_TEMPLATE = """
                 region_type: regionType,
                 start_location: startLocation,
                 destination: destination,
+                headcount: document.querySelector('input[name="headcount"]:checked').value,
                 duration: document.querySelector('input[name="duration"]:checked').value,
+                include_food: document.getElementById('include_food').checked,
+                include_stay: document.getElementById('include_stay').checked,
+                include_fishing: document.getElementById('include_fishing').checked,
                 is_bike_mode: document.getElementById('is_bike_mode').checked,
                 avoid_large_roads: document.getElementById('avoid_large_roads').checked,
                 style: document.querySelector('input[name="style"]:checked').value,
@@ -251,36 +270,62 @@ def generate():
         genai.configure(api_key=API_KEY)
         model = genai.GenerativeModel("gemini-3.6-flash")
 
+        options = []
+        if data.get('include_food'):
+            options.append("- [로컬 맛집/노포]: 관광객용 식당 배제, 현지 주민 추천 백반/향토음식/노포 추천 및 지도 링크 포함.")
+        if data.get('include_stay'):
+            options.append("- [가성비 숙소]: 청결하고 주차 편리한 가성비 호텔/펜션/게스트하우스 추천 및 지도 링크 포함.")
+        if data.get('include_fishing'):
+            options.append("- [선상 낚시]: 동/서/남해 바다권일 경우, 조사들 후기 평점 우수한 실제 선단/선장님 직영 출항지/예약 정보 및 지도 링크 포함 (내륙일 경우 민물/인근 호수 낚시 포인트 추천).")
+
+        options_text = "\n".join(options)
+
         prompt = f"""
-        다음 조건으로 간결하고 명확한 여행/라이딩 일정을 작성해줘.
-        - 지역: {data['region_type']}
+        당신은 국내 최고 수준의 베테랑 여행/라이딩 플래너입니다. 아래 조건에 맞는 완벽한 맞춤 일정을 작성해주세요.
+
+        [여행 조건]
+        - 지역 구분: {data['region_type']}
         - 출발지: {data['start_location']}
         - 목적지: {data['destination']}
-        - 일정: {data['duration']}
-        - 스타일: {data['style']}
+        - 인원수: {data['headcount']}
+        - 여행 기간: {data['duration']}
+        - 여행 스타일: {data['style']}
         - 추가 요청: {data['extra_requests']}
 
-        [규칙]
-        - 핵심 경로 위주로 간결하게 작성할 것.
-        - 출발지 인근 경유지는 배제하고 목적지 방향으로 최소 1시간 주행 후 첫 경유지가 나오게 할 것.
+        [필수 포함 및 추천 사항]
+        {options_text}
+
+        [코스 및 주행 규칙]
+        - 출발지 인근 경유지는 배제하고, 목적지 방향으로 최소 1시간 이상 시원하게 주행한 후 첫 경유지가 나오도록 구성할 것.
         """
 
         if data.get('is_bike_mode'):
             if data['region_type'] == "국내":
-                prompt += "\n- 고속도로 및 자동차 전용도로 진입 금지."
+                prompt += "\n- 바이크 전용: 고속도로 및 자동차 전용도로 절대 진입 금지."
             if data.get('avoid_large_roads'):
-                prompt += "\n- 4차선 대로 배제, 한적한 2차선 지방도/국도 위주 코스."
+                prompt += "\n- 한적한 2차선 지방도/국도 위주 코스 구성 (4차선 대로 배제)."
 
         if data['region_type'] == "국내":
             prompt += """
-        [지도 링크]
-        - 경유지 장소명 뒤에 링크 표기: [네이버지도](https://map.naver.com/v5/search/{장소명}) | [카카오맵](https://map.kakao.com/link/search/{장소명})
+        [링크 서식 규칙]
+        모든 주요 장소명(경유지, 식당, 숙소, 낚시 출항지) 바로 뒤에는 아래 형식으로 지도 링크를 반드시 첨부하세요:
+        - 형식: [네이버지도](https://map.naver.com/v5/search/{장소명}) | [카카오맵](https://map.kakao.com/link/search/{장소명})
             """
         else:
             prompt += """
-        [해외 지도 링크]
-        - 경유지 장소명 뒤에 링크 표기: [구글지도](https://www.google.com/maps/search/?api=1&query={장소명})
+        [해외 링크 서식 규칙]
+        - 형식: [구글지도](https://www.google.com/maps/search/?api=1&query={장소명})
             """
+
+        prompt += """
+        [출력 구조]
+        # {목적지} 맞춤 여행 일정 ({인원수}, {여행 기간})
+        ## 1. 여행 코스 및 일정
+        ## 2. 현지 로컬 맛집 & 노포 추천
+        ## 3. 가성비 숙소 추천
+        ## 4. 선상 낚시 / 레저 정보
+        ## 5. 라이딩 & 여행 꿀팁
+        """
 
         response = model.generate_content(prompt)
         raw_text = response.text
@@ -296,28 +341,75 @@ def download_pdf():
     text_content = request.form.get('text_content', '')
 
     buffer = io.BytesIO()
-    doc = SimpleDocTemplate(buffer, pagesize=A4, rightMargin=24, leftMargin=24, topMargin=28, bottomMargin=28)
+    # A4 세로에 꽉 차도록 여백 최적화 (좌우 20pt, 상하 24pt)
+    doc = SimpleDocTemplate(
+        buffer,
+        pagesize=A4,
+        rightMargin=20,
+        leftMargin=20,
+        topMargin=24,
+        bottomMargin=24
+    )
+    
     styles = getSampleStyleSheet()
     
-    normal_style = ParagraphStyle(name='NormalStyle', fontName=MAIN_FONT, fontSize=10, leading=16, textColor='#333333')
-    h1_style = ParagraphStyle(name='H1Style', fontName=MAIN_FONT, fontSize=14, leading=20, textColor='#1e3d59', spaceBefore=10, spaceAfter=6)
-    h2_style = ParagraphStyle(name='H2Style', fontName=MAIN_FONT, fontSize=12, leading=18, textColor='#17b978', spaceBefore=8, spaceAfter=4)
-    
+    body_style = ParagraphStyle(
+        name='BodyStyle',
+        fontName=MAIN_FONT,
+        fontSize=9.5,
+        leading=14.5,
+        textColor='#222222',
+        spaceAfter=2
+    )
+    h1_style = ParagraphStyle(
+        name='H1Style',
+        fontName=MAIN_FONT,
+        fontSize=13,
+        leading=17,
+        textColor='#1e3d59',
+        spaceBefore=8,
+        spaceAfter=4,
+        keepWithNext=True
+    )
+    h2_style = ParagraphStyle(
+        name='H2Style',
+        fontName=MAIN_FONT,
+        fontSize=11,
+        leading=15,
+        textColor='#0b7285',
+        spaceBefore=6,
+        spaceAfter=3,
+        keepWithNext=True
+    )
+
     story = []
     lines = text_content.split('\n')
+    
     for line in lines:
-        line = re.sub(r'\[([^\]]+)\]\([^\)]+\)', r'\1', line)
-        cleaned_line = line.replace('**', '').replace('###', '').replace('##', '').replace('#', '').strip()
-        if not cleaned_line:
-            story.append(Spacer(1, 4))
+        line_str = line.strip()
+        if not line_str or line_str == '---':
+            story.append(Spacer(1, 3))
             continue
-        if line.startswith('# ') or '일차' in line or 'Day' in line:
-            story.append(Paragraph(cleaned_line, h1_style))
-        elif line.startswith('## ') or line.startswith('### '):
-            story.append(Paragraph(cleaned_line, h2_style))
+
+        # 마크다운 링크 [텍스트](URL) -> PDF 클릭 가능한 하이퍼링크 <link href="URL" color="#1a73e8"><u>텍스트</u></link> 변환
+        line_str = re.sub(
+            r'\[([^\]]+)\]\((https?://[^\)]+)\)',
+            r'<link href="\2" color="#1a73e8"><u>\1</u></link>',
+            line_str
+        )
+        
+        # **볼드** -> <b>볼드</b>
+        line_str = re.sub(r'\*\*(.*?)\*\*', r'<b>\1</b>', line_str)
+
+        if line_str.startswith('# '):
+            story.append(Paragraph(line_str.replace('# ', '').strip(), h1_style))
+        elif line_str.startswith('## '):
+            story.append(Paragraph(line_str.replace('## ', '').strip(), h2_style))
+        elif line_str.startswith('### '):
+            story.append(Paragraph(line_str.replace('### ', '').strip(), h2_style))
         else:
-            story.append(Paragraph(cleaned_line, normal_style))
-            
+            story.append(Paragraph(line_str, body_style))
+
     doc.build(story)
     buffer.seek(0)
 
