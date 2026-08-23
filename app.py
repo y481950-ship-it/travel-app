@@ -7,8 +7,9 @@ from reportlab.lib.pagesizes import A4
 from reportlab.platypus import SimpleDocTemplate, Paragraph, Spacer
 from reportlab.lib.styles import getSampleStyleSheet, ParagraphStyle
 import urllib.request
+import streamlit.components.v1 as components
 
-# 1. 모바일 뷰포트 및 기본 설정
+# 1. 모바일 뷰포트 설정
 st.set_page_config(
     page_title="박영선의 AI 여행 플래너",
     page_icon="🏍️",
@@ -16,15 +17,48 @@ st.set_page_config(
     initial_sidebar_state="collapsed"
 )
 
-# 모바일 상하 터치 스크롤 완전 복구 및 스타일 최적화 CSS
+# 모바일 '당겨서 새로고침(Pull-to-refresh)' 원천 차단 스크립트
+components.html(
+    """
+    <script>
+    (function() {
+        var parentWindow = window.parent;
+        var parentDoc = window.parent.document;
+        
+        var startY = 0;
+        
+        parentDoc.addEventListener('touchstart', function(e) {
+            startY = e.touches[0].pageY;
+        }, { passive: false });
+
+        parentDoc.addEventListener('touchmove', function(e) {
+            var moveY = e.touches[0].pageY;
+            // 최상단에서 아래로 당기는 제스처만 원천 차단
+            if (parentDoc.documentElement.scrollTop <= 0 && parentDoc.body.scrollTop <= 0 && moveY > startY) {
+                if (e.cancelable) {
+                    e.preventDefault();
+                }
+            }
+        }, { passive: false });
+    })();
+    </script>
+    """,
+    height=0,
+    width=0
+)
+
+# CSS로도 2중 차단 및 스크롤 최적화
 st.markdown("""
 <style>
-    /* 스마트폰 터치 스크롤 정상화 및 상하 스크롤 강제 */
-    html, body, [data-testid="stAppViewContainer"], .main {
-        touch-action: pan-y !important;
-        -webkit-overflow-scrolling: touch !important;
-        overflow-y: auto !important;
+    html, body {
         overscroll-behavior-y: none !important;
+        overscroll-behavior: none !important;
+        -webkit-overflow-scrolling: touch !important;
+    }
+    
+    [data-testid="stAppViewContainer"] {
+        overscroll-behavior-y: none !important;
+        overflow-y: auto !important;
     }
     
     .block-container { 
@@ -34,7 +68,6 @@ st.markdown("""
         padding-right: 1rem !important; 
     }
     
-    /* 깔끔하고 시원한 본문 가독성 */
     p, span, div, li { 
         font-size: 1.1rem !important; 
         line-height: 1.6 !important; 
@@ -44,24 +77,18 @@ st.markdown("""
     h2 { font-size: 1.35rem !important; font-weight: bold !important; color: #1e3d59 !important; }
     h3 { font-size: 1.2rem !important; font-weight: bold !important; color: #17b978 !important; }
     
-    /* 지도 링크 강조 */
     a {
         font-size: 1.1rem !important;
         font-weight: bold !important;
         text-decoration: underline !important;
     }
     
-    /* 세련된 버튼 스타일 */
     .stButton>button { 
         width: 100% !important; 
         border-radius: 10px !important; 
         height: 3.4rem !important; 
         font-size: 1.15rem !important;
         font-weight: bold !important; 
-    }
-    
-    div[role="radiogroup"] {
-        gap: 0.5rem;
     }
 </style>
 """, unsafe_allow_html=True)
