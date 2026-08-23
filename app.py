@@ -17,7 +17,7 @@ st.set_page_config(
     initial_sidebar_state="collapsed"
 )
 
-# 모바일 UI 스타일링 (스크롤 간섭 완전 제거)
+# 모바일 UI 스타일링
 st.markdown("""
 <style>
     .block-container { 
@@ -38,6 +38,10 @@ st.markdown("""
         border-radius: 8px !important; 
         height: 3rem !important; 
         font-weight: bold !important; 
+    }
+    /* 라디오 버튼 모바일 최적화 */
+    div[role="radiogroup"] {
+        gap: 0.5rem;
     }
 </style>
 """, unsafe_allow_html=True)
@@ -93,24 +97,34 @@ API_KEY = "AQ.Ab8RN6KNyTYb9CRCpApOtdKKdV5AhjT07NZ5PVbe7ZSIzCXOPw"
 st.title("🏍️ AI 맞춤 여행 플래너")
 
 with st.expander("📝 여행 조건 입력하기", expanded=True):
-    start_location = st.text_input(
-        "출발지 (현재 계신 동네나 시/군/구 입력)", 
-        placeholder="예: 경기 여주시, 서울 강남, 수원 팔달구 등"
-    )
+    # 출발지 설정 (현재 위치 자동 선택 기능 포함)
+    start_type = st.radio("출발지 설정", ["📍 현재 위치 사용 (경기 여주 기준)", "✏️ 다른 지역 직접 입력"], horizontal=True)
+    
+    if start_type == "✏️ 다른 지역 직접 입력":
+        start_location = st.text_input("출발지 입력", placeholder="예: 서울 강남, 수원, 대전 등")
+    else:
+        start_location = "경기 여주(사용자 현재 위치)"
+        st.success("📍 현재 계신 위치(여주)를 출발지로 자동 설정했습니다.")
+
     destination = st.text_input("목적지 (도착지)", placeholder="예: 영월, 속초, 남해, 양평")
-    duration = st.selectbox("여행 기간", ["당일치기", "1박 2일", "2박 3일", "3박 4일"])
+    
+    # 펼침 창 대신 누르면 바로 선택되는 가로 버튼형 선택
+    st.write("**여행 기간**")
+    duration = st.radio("여행 기간 선택", ["당일치기", "1박 2일", "2박 3일", "3박 4일"], horizontal=True, label_visibility="collapsed")
     
     # 바이크 전용 모드
     is_bike_mode = st.checkbox("🏍️ 바이크 투어 모드 (라이딩 전용 경로)", value=True)
     
-    style = st.selectbox("여행 스타일", ["자연/풍경 감상", "맛집/카페 투어", "관광지 위주", "액티비티/체험", "휴양/힐링"])
+    st.write("**여행 스타일**")
+    style = st.radio("여행 스타일 선택", ["자연/풍경 감상", "맛집/카페 투어", "관광지 위주", "액티비티/체험", "휴양/힐링"], label_visibility="collapsed")
+    
     extra_requests = st.text_input("기타 요청사항", placeholder="예: 한적한 와인딩 코스, 뷰 맛집 위주")
 
 if "plan_result" not in st.session_state:
     st.session_state.plan_result = ""
 
 if st.button("🚀 맞춤 여행 일정 만들기"):
-    if not start_location or not destination:
+    if not destination or (start_type == "✏️ 다른 지역 직접 입력" and not start_location):
         st.warning("출발지와 목적지를 모두 입력해주세요.")
     else:
         with st.spinner("최적의 맞춤 일정을 생성하는 중..."):
