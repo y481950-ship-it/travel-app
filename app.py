@@ -249,12 +249,7 @@ def generate():
     data = request.json
     try:
         genai.configure(api_key=API_KEY)
-        
-        # 생각 예산을 0으로 설정하여 딜레이 없이 즉시 답변하도록 생성
-        model = genai.GenerativeModel(
-            "gemini-3.6-flash",
-            generation_config={"thinking_config": {"thinking_budget": 0}}
-        )
+        model = genai.GenerativeModel("gemini-3.6-flash")
 
         prompt = f"""
         다음 조건으로 간결하고 명확한 여행/라이딩 일정을 작성해줘.
@@ -266,6 +261,7 @@ def generate():
         - 추가 요청: {data['extra_requests']}
 
         [규칙]
+        - 핵심 경로 위주로 간결하게 작성할 것.
         - 출발지 인근 경유지는 배제하고 목적지 방향으로 최소 1시간 주행 후 첫 경유지가 나오게 할 것.
         """
 
