@@ -37,7 +37,6 @@ HTML_TEMPLATE = """
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
     <title>박영선의 AI 맞춤 여행 플래너</title>
     
-    <!-- 모바일 전용 앱 아이콘 -->
     <link rel="apple-touch-icon" sizes="180x180" href="https://cdn-icons-png.flaticon.com/512/854/854878.png">
     <link rel="icon" type="image/png" sizes="192x192" href="https://cdn-icons-png.flaticon.com/512/854/854878.png">
     <link rel="icon" type="image/png" sizes="32x32" href="https://cdn-icons-png.flaticon.com/512/854/854878.png">
@@ -116,7 +115,7 @@ HTML_TEMPLATE = """
             <div class="checkbox-group">
                 <label><input type="checkbox" name="travel_style" value="자연/풍경 감상" checked> 🏞️ 자연/풍경</label>
                 <label><input type="checkbox" name="travel_style" value="맛집/카페 투어" checked> ☕ 맛집/카페</label>
-                <label><input type="checkbox" name="travel_style" value="관광지/명소 탐방"> 🏛️ 관광지 탐방</label>
+                <label><input type="checkbox" name="travel_style" value="관광지 탐방"> 🏛️ 관광지 탐방</label>
                 <label><input type="checkbox" name="travel_style" value="휴양/힐링"> 🧘 휴양/힐링</label>
                 <label><input type="checkbox" name="travel_style" value="이색 액티비티/체험"> 🏄 액티비티/체험</label>
             </div>
@@ -182,7 +181,6 @@ HTML_TEMPLATE = """
             const avoidRoadEl = document.getElementById('avoid_large_roads');
             const avoidLargeRoads = isBike && avoidRoadEl ? avoidRoadEl.checked : false;
 
-            // 선택된 여행 스타일 수집
             const selectedStyles = Array.from(document.querySelectorAll('input[name="travel_style"]:checked')).map(el => el.value);
             const styleString = selectedStyles.length > 0 ? selectedStyles.join(', ') : '자유 여행';
 
@@ -209,10 +207,11 @@ HTML_TEMPLATE = """
                     headers: { 'Content-Type': 'application/json' },
                     body: JSON.stringify(payload)
                 });
+                
                 const data = await res.json();
                 
                 if (!res.ok || data.error) {
-                    alert('생성 오류가 발생했습니다: ' + (data.error || '응답 없음'));
+                    alert('생성 실패: ' + (data.error || '알 수 없는 서버 오류'));
                     resetForm();
                     return;
                 }
@@ -223,7 +222,7 @@ HTML_TEMPLATE = """
                 document.getElementById('result-area').style.display = 'block';
                 window.scrollTo({ top: 0, behavior: 'smooth' });
             } catch (err) {
-                alert('서버 응답 오류가 발생했습니다. 잠시 후 다시 시도해주세요.');
+                alert('통신 오류: ' + err.message);
                 resetForm();
             }
         }
@@ -276,47 +275,46 @@ def index():
 
 @app.route('/generate', methods=['POST'])
 def generate():
-    data = request.json
     try:
+        data = request.get_json(force=True)
         genai.configure(api_key=API_KEY)
         model = genai.GenerativeModel("gemini-3.6-flash")
 
         options = []
         if data.get('include_food'):
-            options.append("- [로컬 맛집]: 현지인 추천 찐 맛집/노포 2~3곳과 지도 링크 표기.")
+            options.append("- 로컬 맛집: 현지인 추천 찐 맛집/노포 2곳과 지도 링크")
         if data.get('include_stay'):
-            options.append("- [가성비 숙소]: 주차 편리하고 평점 좋은 가성비 숙소 1~2곳과 지도 링크 표기.")
+            options.append("- 가성비 숙소: 주차 편리하고 평점 좋은 숙소 1~2곳과 지도 링크")
         if data.get('include_fishing'):
-            options.append("- [선상 낚시]: 바다권일 경우 검증된 선단/선장님 정보와 지도 링크 표기.")
+            options.append("- 선상 낚시: 바다권일 경우 검증된 선단/선장님 정보와 지도 링크")
 
         options_text = "\n".join(options)
 
         prompt = f"""
-        당신은 대한민국 최고 수준의 베테랑 여행/라이딩 플래너입니다. 아래 선택된 스타일에 맞춰 여행 일정을 완벽히 조화롭게 구성해주세요.
+        여행/라이딩 플래너로서 아래 조건에 맞춰 간결하고 핵심적인 일정을 작성해주세요.
 
         [조건]
-        - 지역: {data['region_type']} | 출발지: {data['start_location']} | 목적지: {data['destination']}
-        - 인원: {data['headcount']} | 일정: {data['duration']}
-        - 선택된 여행 스타일: {data['styles']} (이 스타일들이 일정 중에 골고루 반영되어야 함)
+        - 지역: {data.get('region_type')} | 출발지: {data.get('start_location')} | 목적지: {data.get('destination')}
+        - 인원: {data.get('headcount')} | 기간: {data.get('duration')}
+        - 여행 스타일: {data.get('styles')}
 
-        [추천 필수 항목]
+        [필수 추천]
         {options_text}
 
-        [주행 및 일정 규칙]
-        - 출발지 인근 경유지는 제외하고 목적지 방향으로 최소 1시간 이상 주행 후 첫 경유지가 나오도록 구성.
+        [규칙]
+        - 출발지 인근 경유지는 제외하고 목적지 방향으로 1시간 주행 후 첫 경유지가 나오게 구성.
         """
 
         if data.get('is_bike_mode'):
-            if data['region_type'] == "국내":
-                prompt += "\n- 바이크 전용: 고속도로 및 자동차 전용도로 절대 진입 금지."
+            if data.get('region_type') == "국내":
+                prompt += "\n- 고속도로 및 자동차 전용도로 절대 진입 금지."
             if data.get('avoid_large_roads'):
-                prompt += "\n- 4차선 대로 배제, 한적한 2차선 지방도/국도 위주 코스."
+                prompt += "\n- 4차선 대로 배제, 2차선 지방도/국도 위주."
 
-        if data['region_type'] == "국내":
+        if data.get('region_type') == "국내":
             prompt += """
         [지도 링크 규칙]
-        주요 장소(식당, 숙소, 체험장, 경유지, 출항지) 뒤에 반드시 아래 형식으로 링크 작성:
-        [네이버지도](https://map.naver.com/v5/search/{장소명}) | [카카오맵](https://map.kakao.com/link/search/{장소명})
+        주요 장소 뒤에 필수 표기: [네이버지도](https://map.naver.com/v5/search/{장소명}) | [카카오맵](https://map.kakao.com/link/search/{장소명})
             """
         else:
             prompt += """
@@ -327,7 +325,7 @@ def generate():
         prompt += """
         [출력 양식]
         # {목적지} 맞춤 여행 일정 ({인원수}, {여행 기간})
-        ## 1. 여행 코스 및 일정
+        ## 1. 여행 코스 및 세부 일정
         ## 2. 현지 로컬 맛집 & 노포
         ## 3. 가성비 숙소 추천
         ## 4. 선상 낚시 / 레저 정보
