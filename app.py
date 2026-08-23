@@ -8,13 +8,35 @@ from reportlab.platypus import SimpleDocTemplate, Paragraph, Spacer
 from reportlab.lib.styles import getSampleStyleSheet, ParagraphStyle
 from reportlab.pdfgen import canvas
 import urllib.request
+import streamlit.components.v1 as components
 
 # 1. 모바일 뷰포트 및 레이아웃 설정
 st.set_page_config(
-    page_title="AI 여행 플래너",
+    page_title="박영선의 AI 여행 플래너",
     page_icon="🏍️",
     layout="centered",
     initial_sidebar_state="collapsed"
+)
+
+# 화면 꺼짐 후 재접속 시 500 에러 방지 (자동 재연결 및 세션 유지 스크립트)
+components.html(
+    """
+    <script>
+    // 25초마다 가벼운 신호를 보내 세션 유지
+    setInterval(function() {
+        window.dispatchEvent(new Event('resize'));
+    }, 25000);
+
+    // 스마트폰 화면이 다시 켜질 때(화면 포커스 복귀 시) 자동 재연결 시도
+    document.addEventListener("visibilitychange", function() {
+        if (document.visibilityState === 'visible') {
+            window.dispatchEvent(new Event('resize'));
+        }
+    });
+    </script>
+    """,
+    height=0,
+    width=0
 )
 
 # 모바일 UI 스타일링
@@ -39,7 +61,6 @@ st.markdown("""
         height: 3rem !important; 
         font-weight: bold !important; 
     }
-    /* 라디오 버튼 모바일 최적화 */
     div[role="radiogroup"] {
         gap: 0.5rem;
     }
@@ -94,10 +115,9 @@ def generate_pdf(text_content):
 API_KEY = "AQ.Ab8RN6KNyTYb9CRCpApOtdKKdV5AhjT07NZ5PVbe7ZSIzCXOPw"
 
 # 5. 화면 구성
-st.title("🏍️ AI 맞춤 여행 플래너")
+st.title("🏍️ 박영선의 AI 여행 플래너")
 
 with st.expander("📝 여행 조건 입력하기", expanded=True):
-    # 출발지 설정 (현재 위치 자동 선택 기능 포함)
     start_type = st.radio("출발지 설정", ["📍 현재 위치 사용 (경기 여주 기준)", "✏️ 다른 지역 직접 입력"], horizontal=True)
     
     if start_type == "✏️ 다른 지역 직접 입력":
@@ -108,11 +128,9 @@ with st.expander("📝 여행 조건 입력하기", expanded=True):
 
     destination = st.text_input("목적지 (도착지)", placeholder="예: 영월, 속초, 남해, 양평")
     
-    # 펼침 창 대신 누르면 바로 선택되는 가로 버튼형 선택
     st.write("**여행 기간**")
     duration = st.radio("여행 기간 선택", ["당일치기", "1박 2일", "2박 3일", "3박 4일"], horizontal=True, label_visibility="collapsed")
     
-    # 바이크 전용 모드
     is_bike_mode = st.checkbox("🏍️ 바이크 투어 모드 (라이딩 전용 경로)", value=True)
     
     st.write("**여행 스타일**")
