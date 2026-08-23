@@ -16,18 +16,32 @@ st.set_page_config(
     initial_sidebar_state="collapsed"
 )
 
-# 화면 가둠 틀 제거 -> 손가락을 떼도 툭툭 튕기며 올라가는 스마트폰 본래 스크롤 복원
+# 상향 스크롤 시 브라우저 간섭 차단 및 양방향 가속 스크롤 강제
 st.markdown("""
 <style>
-    /* 글자 크기 및 여백만 큼직하게 설정 */
+    /* 1. 상단 새로고침 제스처 간섭을 차단해 위로 올릴 때 멈추는 현상 해결 */
+    html, body {
+        overscroll-behavior-y: none !important;
+        -webkit-overflow-scrolling: touch !important;
+    }
+    
+    /* 2. 실제 내용물 박스에 상하 양방향 관성 터치 스크롤 부여 */
+    [data-testid="stAppViewContainer"], section.main {
+        overflow-y: auto !important;
+        -webkit-overflow-scrolling: touch !important;
+        overscroll-behavior-y: none !important;
+        touch-action: pan-y !important;
+    }
+
     .block-container { 
         padding-top: 1.2rem !important; 
-        padding-bottom: 5rem !important; 
+        padding-bottom: 6rem !important; 
         padding-left: 0.8rem !important; 
         padding-right: 0.8rem !important; 
         max-width: 100% !important;
     }
     
+    /* 폰트 및 버튼 크기 */
     p, span, div, li { 
         font-size: 1.1rem !important; 
         line-height: 1.6 !important; 
