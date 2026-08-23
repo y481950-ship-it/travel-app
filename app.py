@@ -1,11 +1,12 @@
-from flask import Flask, request, jsonify, send_file, render_template_string
+from flask import Flask, request, jsonify, send_file, render_template_string, Response
 import google.generativeai as genai
 import os
 import io
 import re
+import json
 import xml.sax.saxutils as saxutils
 from reportlab.lib.pagesizes import A4
-from reportlab.platypus import SimpleDocTemplate, Paragraph, Spacer, Table, TableStyle
+from reportlab.platypus import SimpleDocTemplate, Paragraph, Spacer
 from reportlab.lib.styles import getSampleStyleSheet, ParagraphStyle
 from reportlab.lib import colors
 import urllib.request
@@ -31,38 +32,48 @@ else:
 
 API_KEY = "AQ.Ab8RN6KNyTYb9CRCpApOtdKKdV5AhjT07NZ5PVbe7ZSIzCXOPw"
 
-HTML_TEMPLATE = """
+# 고화질 바이크 전용 앱 아이콘
+APP_ICON_URL = "https://cdn-icons-png.flaticon.com/512/3097/3097180.png"
+
+HTML_TEMPLATE = f"""
 <!DOCTYPE html>
 <html lang="ko">
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+    <meta name="theme-color" content="#1e3d59">
+    <meta name="mobile-web-app-capable" content="yes">
+    <meta name="apple-mobile-web-app-capable" content="yes">
+    <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+    <meta name="apple-mobile-web-app-title" content="AI여행플래너">
+
     <title>박영선의 AI 맞춤 여행 플래너</title>
     
-    <link rel="apple-touch-icon" sizes="180x180" href="https://cdn-icons-png.flaticon.com/512/854/854878.png">
-    <link rel="icon" type="image/png" sizes="192x192" href="https://cdn-icons-png.flaticon.com/512/854/854878.png">
+    <link rel="manifest" href="/manifest.json">
+    <link rel="apple-touch-icon" href="{APP_ICON_URL}">
+    <link rel="icon" type="image/png" href="{APP_ICON_URL}">
 
     <style>
-        * { box-sizing: border-box; margin: 0; padding: 0; }
-        body { font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif; background-color: #f4f6f9; color: #333; padding: 14px; font-size: 15px; line-height: 1.5; }
-        .container { max-width: 600px; margin: 0 auto; background: #fff; padding: 20px; border-radius: 12px; box-shadow: 0 2px 10px rgba(0,0,0,0.08); }
-        h1 { font-size: 1.35rem; color: #1e3d59; margin-bottom: 18px; text-align: center; font-weight: bold; }
-        .section-title { font-size: 0.95rem; font-weight: bold; margin: 14px 0 6px 0; color: #222; }
-        .radio-group, .checkbox-group { display: flex; flex-wrap: wrap; gap: 6px; margin-bottom: 10px; }
-        .radio-group label, .checkbox-group label { background: #f1f3f5; padding: 7px 11px; border-radius: 8px; font-size: 0.9rem; cursor: pointer; display: flex; align-items: center; gap: 5px; }
-        input[type="text"], input[type="number"] { width: 100%; padding: 11px; border: 1px solid #ced4da; border-radius: 8px; font-size: 0.95rem; margin-bottom: 10px; }
-        button { width: 100%; padding: 13px; background: #1a73e8; color: #fff; border: none; border-radius: 8px; font-size: 1.05rem; font-weight: bold; cursor: pointer; margin-top: 10px; }
-        #loading { display: none; text-align: center; padding: 24px; font-weight: bold; color: #1a73e8; font-size: 1.05rem; }
-        #result-area { display: none; margin-top: 16px; }
-        .btn-group { display: flex; gap: 8px; margin-bottom: 14px; }
-        .btn-group button { margin-top: 0; }
-        .btn-reset { background: #6c757d; }
-        .btn-pdf { background: #28a745; }
-        .plan-content { background: #fafafa; border: 1px solid #e2e8f0; padding: 14px; border-radius: 8px; font-size: 0.95rem; line-height: 1.6; }
-        .plan-content h1 { font-size: 1.25rem; color: #1e3d59; text-align: left; margin: 16px 0 8px; border-bottom: 2px solid #1e3d59; padding-bottom: 4px; }
-        .plan-content h2 { font-size: 1.1rem; color: #0b7285; margin: 14px 0 6px; }
-        .plan-content h3 { font-size: 1rem; color: #2b8a3e; margin: 10px 0 4px; }
-        .plan-content a { color: #1a73e8; font-weight: bold; text-decoration: underline; }
+        * {{ box-sizing: border-box; margin: 0; padding: 0; }}
+        body {{ font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif; background-color: #f4f6f9; color: #333; padding: 14px; font-size: 15px; line-height: 1.5; }}
+        .container {{ max-width: 600px; margin: 0 auto; background: #fff; padding: 20px; border-radius: 12px; box-shadow: 0 2px 10px rgba(0,0,0,0.08); }}
+        h1 {{ font-size: 1.35rem; color: #1e3d59; margin-bottom: 18px; text-align: center; font-weight: bold; }}
+        .section-title {{ font-size: 0.95rem; font-weight: bold; margin: 14px 0 6px 0; color: #222; }}
+        .radio-group, .checkbox-group {{ display: flex; flex-wrap: wrap; gap: 6px; margin-bottom: 10px; }}
+        .radio-group label, .checkbox-group label {{ background: #f1f3f5; padding: 7px 11px; border-radius: 8px; font-size: 0.9rem; cursor: pointer; display: flex; align-items: center; gap: 5px; }}
+        input[type="text"], input[type="number"] {{ width: 100%; padding: 11px; border: 1px solid #ced4da; border-radius: 8px; font-size: 0.95rem; margin-bottom: 10px; }}
+        button {{ width: 100%; padding: 13px; background: #1a73e8; color: #fff; border: none; border-radius: 8px; font-size: 1.05rem; font-weight: bold; cursor: pointer; margin-top: 10px; }}
+        #loading {{ display: none; text-align: center; padding: 24px; font-weight: bold; color: #1a73e8; font-size: 1.05rem; }}
+        #result-area {{ display: none; margin-top: 16px; }}
+        .btn-group {{ display: flex; gap: 8px; margin-bottom: 14px; }}
+        .btn-group button {{ margin-top: 0; }}
+        .btn-reset {{ background: #6c757d; }}
+        .btn-pdf {{ background: #28a745; }}
+        .plan-content {{ background: #fafafa; border: 1px solid #e2e8f0; padding: 14px; border-radius: 8px; font-size: 0.95rem; line-height: 1.6; }}
+        .plan-content h1 {{ font-size: 1.25rem; color: #1e3d59; text-align: left; margin: 16px 0 8px; border-bottom: 2px solid #1e3d59; padding-bottom: 4px; }}
+        .plan-content h2 {{ font-size: 1.1rem; color: #0b7285; margin: 14px 0 6px; }}
+        .plan-content h3 {{ font-size: 1rem; color: #2b8a3e; margin: 10px 0 4px; }}
+        .plan-content a {{ color: #1a73e8; font-weight: bold; text-decoration: underline; }}
     </style>
 </head>
 <body>
@@ -143,54 +154,54 @@ HTML_TEMPLATE = """
     </div>
 
     <script>
-        let currentPayload = {};
+        let currentPayload = {{}};
 
-        function toggleRegion() {
+        function toggleRegion() {{
             const isDomestic = document.querySelector('input[name="region_type"]:checked').value === '국내';
             document.getElementById('domestic-start').style.display = isDomestic ? 'block' : 'none';
-            if (!isDomestic) {
+            if (!isDomestic) {{
                 document.getElementById('start_location').style.display = 'block';
                 document.getElementById('start_location').placeholder = '출발지 (공항/도시 입력)';
-            } else {
+            }} else {{
                 toggleStartInput();
-            }
-        }
+            }}
+        }}
 
-        function toggleStartInput() {
+        function toggleStartInput() {{
             const isCustom = document.querySelector('input[name="start_mode"]:checked').value === 'custom';
             const input = document.getElementById('start_location');
             input.style.display = isCustom ? 'block' : 'none';
             input.placeholder = '출발지 입력 (예: 서울 강남, 수원)';
-        }
+        }}
 
-        function toggleHeadcountInput() {
+        function toggleHeadcountInput() {{
             const isCustom = document.querySelector('input[name="headcount"]:checked').value === 'custom';
             document.getElementById('custom_headcount').style.display = isCustom ? 'block' : 'none';
-        }
+        }}
 
-        function toggleAvoidRoad() {
+        function toggleAvoidRoad() {{
             const isBike = document.getElementById('is_bike_mode').checked;
             const avoidLabel = document.getElementById('avoid_road_label');
             if (avoidLabel) avoidLabel.style.display = isBike ? 'inline-flex' : 'none';
-        }
+        }}
 
-        async function generatePlan() {
+        async function generatePlan() {{
             const destination = document.getElementById('destination').value.trim();
-            if (!destination) { alert('목적지를 입력해주세요.'); return; }
+            if (!destination) {{ alert('목적지를 입력해주세요.'); return; }}
 
             const regionType = document.querySelector('input[name="region_type"]:checked').value;
             let startLocation = "경기 여주(현재 위치)";
-            if (regionType === '해외' || document.querySelector('input[name="start_mode"]:checked').value === 'custom') {
+            if (regionType === '해외' || document.querySelector('input[name="start_mode"]:checked').value === 'custom') {{
                 startLocation = document.getElementById('start_location').value.trim();
-                if (!startLocation) { alert('출발지를 입력해주세요.'); return; }
-            }
+                if (!startLocation) {{ alert('출발지를 입력해주세요.'); return; }}
+            }}
 
             let headcountVal = document.querySelector('input[name="headcount"]:checked').value;
-            if (headcountVal === 'custom') {
+            if (headcountVal === 'custom') {{
                 const cVal = document.getElementById('custom_headcount').value.trim();
-                if (!cVal || parseInt(cVal) < 1) { alert('정확한 단체 인원수를 입력해주세요.'); return; }
-                headcountVal = `${cVal}명(단체)`;
-            }
+                if (!cVal || parseInt(cVal) < 1) {{ alert('정확한 단체 인원수를 입력해주세요.'); return; }}
+                headcountVal = `${{cVal}}명(단체)`;
+            }}
 
             const isBike = document.getElementById('is_bike_mode').checked;
             const avoidRoadEl = document.getElementById('avoid_large_roads');
@@ -199,7 +210,7 @@ HTML_TEMPLATE = """
             const selectedStyles = Array.from(document.querySelectorAll('input[name="travel_style"]:checked')).map(el => el.value);
             const styleString = selectedStyles.length > 0 ? selectedStyles.join(', ') : '자유 여행';
 
-            currentPayload = {
+            currentPayload = {{
                 region_type: regionType,
                 start_location: startLocation,
                 destination: destination,
@@ -211,67 +222,67 @@ HTML_TEMPLATE = """
                 is_bike_mode: isBike,
                 avoid_large_roads: avoidLargeRoads,
                 styles: styleString
-            };
+            }};
 
             document.getElementById('plan-form').style.display = 'none';
             document.getElementById('loading').style.display = 'block';
 
-            try {
-                const res = await fetch('/generate', {
+            try {{
+                const res = await fetch('/generate', {{
                     method: 'POST',
-                    headers: { 'Content-Type': 'application/json' },
+                    headers: {{ 'Content-Type': 'application/json' }},
                     body: JSON.stringify(currentPayload)
-                });
+                }});
                 
                 const text = await res.text();
                 let data;
-                try {
+                try {{
                     data = JSON.parse(text);
-                } catch(e) {
-                    alert('서버가 준비 중입니다. 10초 후 다시 눌러주세요.');
+                }} catch(e) {{
+                    alert('서버가 준비 중입니다. 잠시 후 다시 눌러주세요.');
                     resetForm();
                     return;
-                }
+                }}
                 
-                if (!res.ok || data.error) {
-                    alert('생성 실패: ' + (data.error || '오류 발생'));
+                if (!res.ok || data.error) {{
+                    alert(data.error || '생성 중 오류가 발생했습니다.');
                     resetForm();
                     return;
-                }
+                }}
 
                 document.getElementById('plan-display').innerHTML = data.html_text;
                 document.getElementById('loading').style.display = 'none';
                 document.getElementById('result-area').style.display = 'block';
-                window.scrollTo({ top: 0, behavior: 'smooth' });
-            } catch (err) {
+                window.scrollTo({{ top: 0, behavior: 'smooth' }});
+            }} catch (err) {{
                 alert('연결 오류: 잠시 후 다시 시도해주세요.');
                 resetForm();
-            }
-        }
+            }}
+        }}
 
-        function resetForm() {
+        function resetForm() {{
             document.getElementById('result-area').style.display = 'none';
             document.getElementById('loading').style.display = 'none';
             document.getElementById('plan-form').style.display = 'block';
-        }
+        }}
 
-        function downloadPdf() {
+        function downloadPdf() {{
             const form = document.createElement('form');
             form.method = 'POST';
             form.action = '/download_pdf';
 
-            for (const key in currentPayload) {
+            for (const key in currentPayload) {{
                 const input = document.createElement('input');
                 input.type = 'hidden';
                 input.name = key;
                 input.value = currentPayload[key];
                 form.appendChild(input);
-            }
+            }}
 
             document.body.appendChild(form);
             form.submit();
             document.body.removeChild(form);
-        }
+        }}
     </script>
 </body>
 </html>
@@ -285,6 +296,26 @@ def markdown_to_html(text):
     text = re.sub(r'\*\*(.*?)\*\*', r'<strong>\1</strong>', text)
     text = text.replace('\n', '<br>')
     return text
+
+@app.route('/manifest.json')
+def manifest():
+    manifest_data = {
+        "name": "박영선의 AI 여행 플래너",
+        "short_name": "AI여행플래너",
+        "start_url": "/",
+        "display": "standalone",
+        "background_color": "#ffffff",
+        "theme_color": "#1e3d59",
+        "icons": [
+            {
+                "src": APP_ICON_URL,
+                "sizes": "512x512",
+                "type": "image/png",
+                "purpose": "any maskable"
+            }
+        ]
+    }
+    return Response(json.dumps(manifest_data), mimetype='application/json')
 
 @app.route('/')
 def index():
@@ -355,7 +386,10 @@ def generate():
 
         return jsonify({'raw_text': raw_text, 'html_text': html_text})
     except Exception as e:
-        return jsonify({'error': str(e)}), 500
+        err_msg = str(e)
+        if "429" in err_msg or "Quota exceeded" in err_msg or "RESOURCE_EXHAUSTED" in err_msg:
+            return jsonify({'error': '⚠️ 오늘 무료 AI 사용량(20회)이 모두 소진되었습니다.\n한국 시간 기준 내일 오후 4시에 자동 초기화됩니다.'}), 429
+        return jsonify({'error': f'오류 발생: {err_msg}'}), 500
 
 @app.route('/download_pdf', methods=['POST'])
 def download_pdf():
@@ -364,12 +398,10 @@ def download_pdf():
         headcount = request.form.get('headcount', '1명')
         duration = request.form.get('duration', '당일치기')
         styles = request.form.get('styles', '자유 여행')
-        region_type = request.form.get('region_type', '국내')
 
         genai.configure(api_key=API_KEY)
         model = genai.GenerativeModel("gemini-3.6-flash")
 
-        # PDF 전용 간결한 견적/정보 생성 프롬프트 (경유지 이동 코스 제외)
         pdf_prompt = f"""
         여행 정산 및 정보 요약 전문가로서, 아래 조건에 맞춰 PDF 인쇄용 [여행 견적 및 핵심 추천 요약서]를 작성해주세요.
         *주의: 지루한 경유지나 이동 코스는 완전히 제외하고, 경비 정산표와 핵심 장소(숙소/맛집/체험) 정보만 명확히 작성하세요.*
@@ -454,7 +486,6 @@ def download_pdf():
                 story.append(Spacer(1, 4))
                 continue
 
-            # XML 특수문자 안전 이스케이프 후 볼드 복원
             safe_text = saxutils.escape(line_str)
             safe_text = re.sub(r'\*\*(.*?)\*\*', r'<b>\1</b>', safe_text)
 
