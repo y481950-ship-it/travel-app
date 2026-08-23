@@ -72,7 +72,7 @@ def generate_pdf(text_content):
     return buffer
 
 # 4. Gemini API 키
-API_KEY = "gen-lang-client-0836113123"
+API_KEY = "AQ.Ab8RN6KNyTYb9CRCpApOtdKKdV5AhjT07NZ5PVbe7ZSIzCXOPw"
 
 # 5. 화면 구성
 st.title("📱 AI 맞춤 여행 플래너")
