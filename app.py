@@ -39,7 +39,6 @@ HTML_TEMPLATE = """
     
     <link rel="apple-touch-icon" sizes="180x180" href="https://cdn-icons-png.flaticon.com/512/854/854878.png">
     <link rel="icon" type="image/png" sizes="192x192" href="https://cdn-icons-png.flaticon.com/512/854/854878.png">
-    <link rel="icon" type="image/png" sizes="32x32" href="https://cdn-icons-png.flaticon.com/512/854/854878.png">
 
     <style>
         * { box-sizing: border-box; margin: 0; padding: 0; }
@@ -90,9 +89,9 @@ HTML_TEMPLATE = """
 
             <div class="section-title">4. 인원수</div>
             <div class="radio-group">
-                <label><input type="radio" name="headcount" value="1명(솔로 투어)" checked> 👤 1인(솔투)</label>
-                <label><input type="radio" name="headcount" value="2명(듀오)"> 👥 2인</label>
-                <label><input type="radio" name="headcount" value="3~4명(소그룹)"> 👨‍👩‍👧 3~4인</label>
+                <label><input type="radio" name="headcount" value="1인(솔투)" checked> 👤 1인(솔투)</label>
+                <label><input type="radio" name="headcount" value="2인"> 👥 2인</label>
+                <label><input type="radio" name="headcount" value="3~4인"> 👨‍👩‍👧 3~4인</label>
                 <label><input type="radio" name="headcount" value="5인 이상(단체)"> 🚌 단체</label>
             </div>
 
@@ -163,7 +162,8 @@ HTML_TEMPLATE = """
 
         function toggleAvoidRoad() {
             const isBike = document.getElementById('is_bike_mode').checked;
-            document.getElementById('avoid_road_label').style.display = isBike ? 'inline-flex' : 'none';
+            const avoidLabel = document.getElementById('avoid_road_label');
+            if (avoidLabel) avoidLabel.style.display = isBike ? 'inline-flex' : 'none';
         }
 
         async function generatePlan() {
@@ -208,10 +208,18 @@ HTML_TEMPLATE = """
                     body: JSON.stringify(payload)
                 });
                 
-                const data = await res.json();
+                const text = await res.text();
+                let data;
+                try {
+                    data = JSON.parse(text);
+                } catch(e) {
+                    alert('서버가 준비 중입니다. 10초 후 다시 눌러주세요.');
+                    resetForm();
+                    return;
+                }
                 
                 if (!res.ok || data.error) {
-                    alert('생성 실패: ' + (data.error || '알 수 없는 서버 오류'));
+                    alert('생성 실패: ' + (data.error || '오류 발생'));
                     resetForm();
                     return;
                 }
@@ -222,7 +230,7 @@ HTML_TEMPLATE = """
                 document.getElementById('result-area').style.display = 'block';
                 window.scrollTo({ top: 0, behavior: 'smooth' });
             } catch (err) {
-                alert('통신 오류: ' + err.message);
+                alert('연결 오류: 잠시 후 다시 시도해주세요.');
                 resetForm();
             }
         }
@@ -282,21 +290,21 @@ def generate():
 
         options = []
         if data.get('include_food'):
-            options.append("- 로컬 맛집: 현지인 추천 찐 맛집/노포 2곳과 지도 링크")
+            options.append("- 로컬 맛집: 현지인 추천 노포 2곳과 지도 링크")
         if data.get('include_stay'):
-            options.append("- 가성비 숙소: 주차 편리하고 평점 좋은 숙소 1~2곳과 지도 링크")
+            options.append("- 가성비 숙소: 평점 높은 가성비 숙소 1~2곳과 지도 링크")
         if data.get('include_fishing'):
-            options.append("- 선상 낚시: 바다권일 경우 검증된 선단/선장님 정보와 지도 링크")
+            options.append("- 선상 낚시: 바다권일 경우 검증된 선단 정보와 지도 링크")
 
         options_text = "\n".join(options)
 
         prompt = f"""
-        여행/라이딩 플래너로서 아래 조건에 맞춰 간결하고 핵심적인 일정을 작성해주세요.
+        여행 플래너로서 아래 조건에 맞춰 명확하고 간결한 일정을 작성하세요.
 
         [조건]
         - 지역: {data.get('region_type')} | 출발지: {data.get('start_location')} | 목적지: {data.get('destination')}
-        - 인원: {data.get('headcount')} | 기간: {data.get('duration')}
-        - 여행 스타일: {data.get('styles')}
+        - 인원: {data.get('headcount')} | 일정: {data.get('duration')}
+        - 스타일: {data.get('styles')}
 
         [필수 추천]
         {options_text}
@@ -307,25 +315,25 @@ def generate():
 
         if data.get('is_bike_mode'):
             if data.get('region_type') == "국내":
-                prompt += "\n- 고속도로 및 자동차 전용도로 절대 진입 금지."
+                prompt += "\n- 고속도로 및 자동차 전용도로 진입 금지."
             if data.get('avoid_large_roads'):
                 prompt += "\n- 4차선 대로 배제, 2차선 지방도/국도 위주."
 
         if data.get('region_type') == "국내":
             prompt += """
-        [지도 링크 규칙]
+        [지도 링크]
         주요 장소 뒤에 필수 표기: [네이버지도](https://map.naver.com/v5/search/{장소명}) | [카카오맵](https://map.kakao.com/link/search/{장소명})
             """
         else:
             prompt += """
-        [지도 링크 규칙]
+        [지도 링크]
         [구글지도](https://www.google.com/maps/search/?api=1&query={장소명})
             """
 
         prompt += """
         [출력 양식]
         # {목적지} 맞춤 여행 일정 ({인원수}, {여행 기간})
-        ## 1. 여행 코스 및 세부 일정
+        ## 1. 여행 코스 및 일정
         ## 2. 현지 로컬 맛집 & 노포
         ## 3. 가성비 숙소 추천
         ## 4. 선상 낚시 / 레저 정보
