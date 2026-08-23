@@ -11,7 +11,7 @@ import streamlit.components.v1 as components
 
 # 1. 기본 설정
 st.set_page_config(
-    page_title="로이 여행",
+    page_title="박영선의 AI 여행 플래너",
     page_icon="🏍️",
     layout="centered"
 )
@@ -19,12 +19,9 @@ st.set_page_config(
 # 2. 모바일 네이티브 관성 스크롤 복원 및 상단 간섭 박멸
 st.markdown("""
 <style>
-    /* 상단 투명 헤더 간섭 제거 */
     header[data-testid="stHeader"] {
         display: none !important;
     }
-    
-    /* 폰트 및 모바일 레이아웃 */
     .block-container { 
         padding-top: 1.2rem !important; 
         padding-bottom: 6rem !important; 
@@ -32,16 +29,13 @@ st.markdown("""
         padding-right: 0.8rem !important; 
         max-width: 100% !important;
     }
-    
     p, span, div, li { 
         font-size: 1.08rem !important; 
         line-height: 1.6 !important; 
     }
-    
     h1 { font-size: 1.5rem !important; font-weight: bold !important; }
     h2 { font-size: 1.3rem !important; font-weight: bold !important; color: #1e3d59 !important; }
     h3 { font-size: 1.15rem !important; font-weight: bold !important; color: #17b978 !important; }
-    
     .stButton>button { 
         width: 100% !important; 
         border-radius: 10px !important; 
@@ -107,7 +101,6 @@ def generate_pdf(text_content):
     story = []
     lines = text_content.split('\n')
     for line in lines:
-        # 지도 링크 및 특수 마크다운 태그 정돈
         line = re.sub(r'\[([^\]]+)\]\([^\)]+\)', r'\1', line)
         cleaned_line = line.replace('**', '').replace('###', '').replace('##', '').replace('#', '').strip()
         
@@ -167,7 +160,7 @@ if not st.session_state.plan_result:
             with st.spinner("최적의 여행 코스를 구성하고 있습니다..."):
                 try:
                     genai.configure(api_key=API_KEY)
-                    model = genai.GenerativeModel("gemini-2.5-flash")
+                    model = genai.GenerativeModel("gemini-3.6-flash")
                     
                     prompt = f"""
                     다음 조건으로 여행/라이딩 일정을 작성해줘.
