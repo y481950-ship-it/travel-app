@@ -1,4 +1,4 @@
-from flask import Flask, request, jsonify, send_file, render_template_string, Response
+from flask import Flask, request, jsonify, send_file, render_template_string, Response, send_from_directory
 import google.generativeai as genai
 import os
 import io
@@ -32,10 +32,7 @@ else:
 
 API_KEY = "AQ.Ab8RN6KNyTYb9CRCpApOtdKKdV5AhjT07NZ5PVbe7ZSIzCXOPw"
 
-# 고화질 레드/블랙 바이크 전용 아이콘 (512x512)
-APP_ICON_URL = "https://cdn-icons-png.flaticon.com/512/3198/3198336.png"
-
-HTML_TEMPLATE = f"""
+HTML_TEMPLATE = """
 <!DOCTYPE html>
 <html lang="ko">
 <head>
@@ -50,30 +47,30 @@ HTML_TEMPLATE = f"""
     <title>박영선의 AI 맞춤 여행 플래너</title>
     
     <link rel="manifest" href="/manifest.json">
-    <link rel="apple-touch-icon" href="{APP_ICON_URL}">
-    <link rel="icon" type="image/png" href="{APP_ICON_URL}">
+    <link rel="apple-touch-icon" href="/icon-512.png">
+    <link rel="icon" type="image/png" href="/icon-512.png">
 
     <style>
-        * {{ box-sizing: border-box; margin: 0; padding: 0; }}
-        body {{ font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif; background-color: #f4f6f9; color: #333; padding: 14px; font-size: 15px; line-height: 1.5; }}
-        .container {{ max-width: 600px; margin: 0 auto; background: #fff; padding: 20px; border-radius: 12px; box-shadow: 0 2px 10px rgba(0,0,0,0.08); }}
-        h1 {{ font-size: 1.35rem; color: #1e3d59; margin-bottom: 18px; text-align: center; font-weight: bold; }}
-        .section-title {{ font-size: 0.95rem; font-weight: bold; margin: 14px 0 6px 0; color: #222; }}
-        .radio-group, .checkbox-group {{ display: flex; flex-wrap: wrap; gap: 6px; margin-bottom: 10px; }}
-        .radio-group label, .checkbox-group label {{ background: #f1f3f5; padding: 7px 11px; border-radius: 8px; font-size: 0.9rem; cursor: pointer; display: flex; align-items: center; gap: 5px; }}
-        input[type="text"], input[type="number"] {{ width: 100%; padding: 11px; border: 1px solid #ced4da; border-radius: 8px; font-size: 0.95rem; margin-bottom: 10px; }}
-        button {{ width: 100%; padding: 13px; background: #1a73e8; color: #fff; border: none; border-radius: 8px; font-size: 1.05rem; font-weight: bold; cursor: pointer; margin-top: 10px; }}
-        #loading {{ display: none; text-align: center; padding: 24px; font-weight: bold; color: #1a73e8; font-size: 1.05rem; }}
-        #result-area {{ display: none; margin-top: 16px; }}
-        .btn-group {{ display: flex; gap: 8px; margin-bottom: 14px; }}
-        .btn-group button {{ margin-top: 0; }}
-        .btn-reset {{ background: #6c757d; }}
-        .btn-pdf {{ background: #28a745; }}
-        .plan-content {{ background: #fafafa; border: 1px solid #e2e8f0; padding: 14px; border-radius: 8px; font-size: 0.95rem; line-height: 1.6; }}
-        .plan-content h1 {{ font-size: 1.25rem; color: #1e3d59; text-align: left; margin: 16px 0 8px; border-bottom: 2px solid #1e3d59; padding-bottom: 4px; }}
-        .plan-content h2 {{ font-size: 1.1rem; color: #0b7285; margin: 14px 0 6px; }}
-        .plan-content h3 {{ font-size: 1rem; color: #2b8a3e; margin: 10px 0 4px; }}
-        .plan-content a {{ color: #1a73e8; font-weight: bold; text-decoration: underline; }}
+        * { box-sizing: border-box; margin: 0; padding: 0; }
+        body { font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif; background-color: #f4f6f9; color: #333; padding: 14px; font-size: 15px; line-height: 1.5; }
+        .container { max-width: 600px; margin: 0 auto; background: #fff; padding: 20px; border-radius: 12px; box-shadow: 0 2px 10px rgba(0,0,0,0.08); }
+        h1 { font-size: 1.35rem; color: #1e3d59; margin-bottom: 18px; text-align: center; font-weight: bold; }
+        .section-title { font-size: 0.95rem; font-weight: bold; margin: 14px 0 6px 0; color: #222; }
+        .radio-group, .checkbox-group { display: flex; flex-wrap: wrap; gap: 6px; margin-bottom: 10px; }
+        .radio-group label, .checkbox-group label { background: #f1f3f5; padding: 7px 11px; border-radius: 8px; font-size: 0.9rem; cursor: pointer; display: flex; align-items: center; gap: 5px; }
+        input[type="text"], input[type="number"] { width: 100%; padding: 11px; border: 1px solid #ced4da; border-radius: 8px; font-size: 0.95rem; margin-bottom: 10px; }
+        button { width: 100%; padding: 13px; background: #1a73e8; color: #fff; border: none; border-radius: 8px; font-size: 1.05rem; font-weight: bold; cursor: pointer; margin-top: 10px; }
+        #loading { display: none; text-align: center; padding: 24px; font-weight: bold; color: #1a73e8; font-size: 1.05rem; }
+        #result-area { display: none; margin-top: 16px; }
+        .btn-group { display: flex; gap: 8px; margin-bottom: 14px; }
+        .btn-group button { margin-top: 0; }
+        .btn-reset { background: #6c757d; }
+        .btn-pdf { background: #28a745; }
+        .plan-content { background: #fafafa; border: 1px solid #e2e8f0; padding: 14px; border-radius: 8px; font-size: 0.95rem; line-height: 1.6; }
+        .plan-content h1 { font-size: 1.25rem; color: #1e3d59; text-align: left; margin: 16px 0 8px; border-bottom: 2px solid #1e3d59; padding-bottom: 4px; }
+        .plan-content h2 { font-size: 1.1rem; color: #0b7285; margin: 14px 0 6px; }
+        .plan-content h3 { font-size: 1rem; color: #2b8a3e; margin: 10px 0 4px; }
+        .plan-content a { color: #1a73e8; font-weight: bold; text-decoration: underline; }
     </style>
 </head>
 <body>
@@ -154,59 +151,59 @@ HTML_TEMPLATE = f"""
     </div>
 
     <script>
-        // 서비스 워커 등록 (PWA 앱 독립 실행용)
-        if ('serviceWorker' in navigator) {{
+        // PWA 서비스워커 등록
+        if ('serviceWorker' in navigator) {
             navigator.serviceWorker.register('/sw.js');
-        }}
+        }
 
-        let currentPayload = {{}};
+        let currentPayload = {};
 
-        function toggleRegion() {{
+        function toggleRegion() {
             const isDomestic = document.querySelector('input[name="region_type"]:checked').value === '국내';
             document.getElementById('domestic-start').style.display = isDomestic ? 'block' : 'none';
-            if (!isDomestic) {{
+            if (!isDomestic) {
                 document.getElementById('start_location').style.display = 'block';
                 document.getElementById('start_location').placeholder = '출발지 (공항/도시 입력)';
-            }} else {{
+            } else {
                 toggleStartInput();
-            }}
-        }}
+            }
+        }
 
-        function toggleStartInput() {{
+        function toggleStartInput() {
             const isCustom = document.querySelector('input[name="start_mode"]:checked').value === 'custom';
             const input = document.getElementById('start_location');
             input.style.display = isCustom ? 'block' : 'none';
             input.placeholder = '출발지 입력 (예: 서울 강남, 수원)';
-        }}
+        }
 
-        function toggleHeadcountInput() {{
+        function toggleHeadcountInput() {
             const isCustom = document.querySelector('input[name="headcount"]:checked').value === 'custom';
             document.getElementById('custom_headcount').style.display = isCustom ? 'block' : 'none';
-        }}
+        }
 
-        function toggleAvoidRoad() {{
+        function toggleAvoidRoad() {
             const isBike = document.getElementById('is_bike_mode').checked;
             const avoidLabel = document.getElementById('avoid_road_label');
             if (avoidLabel) avoidLabel.style.display = isBike ? 'inline-flex' : 'none';
-        }}
+        }
 
-        async function generatePlan() {{
+        async function generatePlan() {
             const destination = document.getElementById('destination').value.trim();
-            if (!destination) {{ alert('목적지를 입력해주세요.'); return; }}
+            if (!destination) { alert('목적지를 입력해주세요.'); return; }
 
             const regionType = document.querySelector('input[name="region_type"]:checked').value;
             let startLocation = "경기 여주(현재 위치)";
-            if (regionType === '해외' || document.querySelector('input[name="start_mode"]:checked').value === 'custom') {{
+            if (regionType === '해외' || document.querySelector('input[name="start_mode"]:checked').value === 'custom') {
                 startLocation = document.getElementById('start_location').value.trim();
-                if (!startLocation) {{ alert('출발지를 입력해주세요.'); return; }}
-            }}
+                if (!startLocation) { alert('출발지를 입력해주세요.'); return; }
+            }
 
             let headcountVal = document.querySelector('input[name="headcount"]:checked').value;
-            if (headcountVal === 'custom') {{
+            if (headcountVal === 'custom') {
                 const cVal = document.getElementById('custom_headcount').value.trim();
-                if (!cVal || parseInt(cVal) < 1) {{ alert('정확한 단체 인원수를 입력해주세요.'); return; }}
-                headcountVal = `${{cVal}}명(단체)`;
-            }}
+                if (!cVal || parseInt(cVal) < 1) { alert('정확한 단체 인원수를 입력해주세요.'); return; }
+                headcountVal = `${cVal}명(단체)`;
+            }
 
             const isBike = document.getElementById('is_bike_mode').checked;
             const avoidRoadEl = document.getElementById('avoid_large_roads');
@@ -215,7 +212,7 @@ HTML_TEMPLATE = f"""
             const selectedStyles = Array.from(document.querySelectorAll('input[name="travel_style"]:checked')).map(el => el.value);
             const styleString = selectedStyles.length > 0 ? selectedStyles.join(', ') : '자유 여행';
 
-            currentPayload = {{
+            currentPayload = {
                 region_type: regionType,
                 start_location: startLocation,
                 destination: destination,
@@ -227,67 +224,67 @@ HTML_TEMPLATE = f"""
                 is_bike_mode: isBike,
                 avoid_large_roads: avoidLargeRoads,
                 styles: styleString
-            }};
+            };
 
             document.getElementById('plan-form').style.display = 'none';
             document.getElementById('loading').style.display = 'block';
 
-            try {{
-                const res = await fetch('/generate', {{
+            try {
+                const res = await fetch('/generate', {
                     method: 'POST',
-                    headers: {{ 'Content-Type': 'application/json' }},
+                    headers: { 'Content-Type': 'application/json' },
                     body: JSON.stringify(currentPayload)
-                }});
+                });
                 
                 const text = await res.text();
                 let data;
-                try {{
+                try {
                     data = JSON.parse(text);
-                }} catch(e) {{
+                } catch(e) {
                     alert('서버가 준비 중입니다. 잠시 후 다시 눌러주세요.');
                     resetForm();
                     return;
-                }}
+                }
                 
-                if (!res.ok || data.error) {{
+                if (!res.ok || data.error) {
                     alert(data.error || '생성 중 오류가 발생했습니다.');
                     resetForm();
                     return;
-                }}
+                }
 
                 document.getElementById('plan-display').innerHTML = data.html_text;
                 document.getElementById('loading').style.display = 'none';
                 document.getElementById('result-area').style.display = 'block';
-                window.scrollTo({{ top: 0, behavior: 'smooth' }});
-            }} catch (err) {{
+                window.scrollTo({ top: 0, behavior: 'smooth' });
+            } catch (err) {
                 alert('연결 오류: 잠시 후 다시 시도해주세요.');
                 resetForm();
-            }}
-        }}
+            }
+        }
 
-        function resetForm() {{
+        function resetForm() {
             document.getElementById('result-area').style.display = 'none';
             document.getElementById('loading').style.display = 'none';
             document.getElementById('plan-form').style.display = 'block';
-        }}
+        }
 
-        function downloadPdf() {{
+        function downloadPdf() {
             const form = document.createElement('form');
             form.method = 'POST';
             form.action = '/download_pdf';
 
-            for (const key in currentPayload) {{
+            for (const key in currentPayload) {
                 const input = document.createElement('input');
                 input.type = 'hidden';
                 input.name = key;
                 input.value = currentPayload[key];
                 form.appendChild(input);
-            }}
+            }
 
             document.body.appendChild(form);
             form.submit();
             document.body.removeChild(form);
-        }}
+        }
     </script>
 </body>
 </html>
@@ -301,6 +298,10 @@ def markdown_to_html(text):
     text = re.sub(r'\*\*(.*?)\*\*', r'<strong>\1</strong>', text)
     text = text.replace('\n', '<br>')
     return text
+
+@app.route('/icon-512.png')
+def custom_icon():
+    return send_from_directory(os.getcwd(), 'icon-512.png')
 
 @app.route('/sw.js')
 def service_worker():
@@ -318,7 +319,7 @@ def manifest():
         "theme_color": "#1e3d59",
         "icons": [
             {
-                "src": APP_ICON_URL,
+                "src": "/icon-512.png",
                 "sizes": "512x512",
                 "type": "image/png",
                 "purpose": "any maskable"
