@@ -16,26 +16,38 @@ st.set_page_config(
     layout="centered"
 )
 
-# 2. 모바일 네이티브 관성 스크롤 복원 및 상단 간섭 박멸
+# 상단 고정 및 스크롤 끼임 방지
 st.markdown("""
 <style>
+    /* 상단 Streamlit 헤더 숨김 */
     header[data-testid="stHeader"] {
         display: none !important;
     }
+    
+    /* 모바일 전체 컨테이너 높이 구속 해제 */
+    html, body, [data-testid="stAppViewContainer"], section.main, .block-container {
+        height: auto !important;
+        min-height: 100vh !important;
+        overflow-y: visible !important;
+    }
+
     .block-container { 
-        padding-top: 1.2rem !important; 
-        padding-bottom: 6rem !important; 
+        padding-top: 1rem !important; 
+        padding-bottom: 5rem !important; 
         padding-left: 0.8rem !important; 
         padding-right: 0.8rem !important; 
         max-width: 100% !important;
     }
+    
     p, span, div, li { 
         font-size: 1.08rem !important; 
         line-height: 1.6 !important; 
     }
+    
     h1 { font-size: 1.5rem !important; font-weight: bold !important; }
     h2 { font-size: 1.3rem !important; font-weight: bold !important; color: #1e3d59 !important; }
     h3 { font-size: 1.15rem !important; font-weight: bold !important; color: #17b978 !important; }
+    
     .stButton>button { 
         width: 100% !important; 
         border-radius: 10px !important; 
@@ -46,32 +58,7 @@ st.markdown("""
 </style>
 """, unsafe_allow_html=True)
 
-# 자바스크립트로 스마트폰 순정 가속 스크롤 강제 활성화
-components.html("""
-<script>
-    const setScroll = () => {
-        const root = window.parent.document;
-        const targets = [
-            root.documentElement,
-            root.body,
-            root.querySelector('[data-testid="stAppViewContainer"]'),
-            root.querySelector('section.main')
-        ];
-        targets.forEach(el => {
-            if (el) {
-                el.style.setProperty('overflow-y', 'scroll', 'important');
-                el.style.setProperty('-webkit-overflow-scrolling', 'touch', 'important');
-                el.style.setProperty('overscroll-behavior-y', 'auto', 'important');
-                el.style.setProperty('touch-action', 'pan-y', 'important');
-            }
-        });
-    };
-    setScroll();
-    setInterval(setScroll, 1000);
-</script>
-""", height=0, width=0)
-
-# 3. 한글 폰트 설정 (PDF용)
+# 2. 한글 폰트 설정 (PDF용)
 FONT_PATH = "NanumGothic.ttf"
 if not os.path.exists(FONT_PATH):
     try:
@@ -88,7 +75,7 @@ if os.path.exists(FONT_PATH):
 else:
     MAIN_FONT = "Helvetica"
 
-# 4. PDF 정렬/깨짐 보정 함수
+# 3. PDF 생성 함수 (서식 정돈)
 def generate_pdf(text_content):
     buffer = io.BytesIO()
     doc = SimpleDocTemplate(buffer, pagesize=A4, rightMargin=24, leftMargin=24, topMargin=28, bottomMargin=28)
@@ -212,6 +199,17 @@ if not st.session_state.plan_result:
                     st.error(f"생성 오류: {e}")
 
 else:
+    # 결과 출력 시 화면 맨 위로 즉시 이동
+    components.html("""
+    <script>
+        window.parent.scrollTo(0, 0);
+        const appContainer = window.parent.document.querySelector('[data-testid="stAppViewContainer"]');
+        if (appContainer) {
+            appContainer.scrollTop = 0;
+        }
+    </script>
+    """, height=0, width=0)
+
     st.markdown("### 🗺️ 생성된 맞춤 여행 일정")
     st.markdown(st.session_state.plan_result)
     
