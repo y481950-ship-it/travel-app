@@ -36,6 +36,11 @@ HTML_TEMPLATE = """
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
     <title>박영선의 AI 맞춤 여행 플래너</title>
+    
+    <link rel="apple-touch-icon" sizes="180x180" href="https://cdn-icons-png.flaticon.com/512/854/854878.png">
+    <link rel="icon" type="image/png" sizes="192x192" href="https://cdn-icons-png.flaticon.com/512/854/854878.png">
+    <link rel="icon" type="image/png" sizes="32x32" href="https://cdn-icons-png.flaticon.com/512/854/854878.png">
+
     <style>
         * { box-sizing: border-box; margin: 0; padding: 0; }
         body { font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif; background-color: #f4f6f9; color: #333; padding: 14px; font-size: 15px; line-height: 1.5; }
@@ -121,7 +126,7 @@ HTML_TEMPLATE = """
             </div>
 
             <div class="section-title">9. 기타 요청사항</div>
-            <input type="text" id="extra_requests" placeholder="예: 한적한 와인딩, 뷰 좋은 곳, 특정 어종 낚시 등">
+            <input type="text" id="extra_requests" placeholder="예: 한적한 와인딩, 뷰 좋은 곳 등">
 
             <button type="button" id="submit-btn" onclick="generatePlan()">🚀 맞춤 일정 생성하기</button>
         </form>
@@ -174,6 +179,10 @@ HTML_TEMPLATE = """
                 if (!startLocation) { alert('출발지를 입력해주세요.'); return; }
             }
 
+            const isBike = document.getElementById('is_bike_mode').checked;
+            const avoidRoadEl = document.getElementById('avoid_large_roads');
+            const avoidLargeRoads = isBike && avoidRoadEl ? avoidRoadEl.checked : false;
+
             document.getElementById('plan-form').style.display = 'none';
             document.getElementById('loading').style.display = 'block';
 
@@ -186,8 +195,8 @@ HTML_TEMPLATE = """
                 include_food: document.getElementById('include_food').checked,
                 include_stay: document.getElementById('include_stay').checked,
                 include_fishing: document.getElementById('include_fishing').checked,
-                is_bike_mode: document.getElementById('is_bike_mode').checked,
-                avoid_large_roads: document.getElementById('avoid_large_roads').checked,
+                is_bike_mode: isBike,
+                avoid_large_roads: avoidLargeRoads,
                 style: document.querySelector('input[name="style"]:checked').value,
                 extra_requests: document.getElementById('extra_requests').value.trim()
             };
@@ -272,59 +281,55 @@ def generate():
 
         options = []
         if data.get('include_food'):
-            options.append("- [로컬 맛집/노포]: 관광객용 식당 배제, 현지 주민 추천 백반/향토음식/노포 추천 및 지도 링크 포함.")
+            options.append("- [로컬 맛집]: 현지인 추천 찐 맛집/노포 2~3곳과 지도 링크 표기.")
         if data.get('include_stay'):
-            options.append("- [가성비 숙소]: 청결하고 주차 편리한 가성비 호텔/펜션/게스트하우스 추천 및 지도 링크 포함.")
+            options.append("- [가성비 숙소]: 주차 편리하고 평점 좋은 가성비 숙소 1~2곳과 지도 링크 표기.")
         if data.get('include_fishing'):
-            options.append("- [선상 낚시]: 동/서/남해 바다권일 경우, 조사들 후기 평점 우수한 실제 선단/선장님 직영 출항지/예약 정보 및 지도 링크 포함 (내륙일 경우 민물/인근 호수 낚시 포인트 추천).")
+            options.append("- [선상 낚시]: 바다권일 경우 검증된 선단/선장님 정보와 지도 링크 표기.")
 
         options_text = "\n".join(options)
 
         prompt = f"""
-        당신은 국내 최고 수준의 베테랑 여행/라이딩 플래너입니다. 아래 조건에 맞는 완벽한 맞춤 일정을 작성해주세요.
+        당신은 베테랑 여행/라이딩 플래너입니다. 아래 조건에 맞는 맞춤 일정을 핵심 위주로 명확하게 작성해주세요.
 
-        [여행 조건]
-        - 지역 구분: {data['region_type']}
-        - 출발지: {data['start_location']}
-        - 목적지: {data['destination']}
-        - 인원수: {data['headcount']}
-        - 여행 기간: {data['duration']}
-        - 여행 스타일: {data['style']}
-        - 추가 요청: {data['extra_requests']}
+        [조건]
+        - 지역: {data['region_type']} | 출발지: {data['start_location']} | 목적지: {data['destination']}
+        - 인원: {data['headcount']} | 일정: {data['duration']} | 스타일: {data['style']}
+        - 요청사항: {data['extra_requests']}
 
-        [필수 포함 및 추천 사항]
+        [포함 항목]
         {options_text}
 
-        [코스 및 주행 규칙]
-        - 출발지 인근 경유지는 배제하고, 목적지 방향으로 최소 1시간 이상 시원하게 주행한 후 첫 경유지가 나오도록 구성할 것.
+        [주행 규칙]
+        - 출발지 인근 경유지는 제외하고 목적지 방향으로 1시간 주행 후 첫 경유지가 나오게 구성할 것.
         """
 
         if data.get('is_bike_mode'):
             if data['region_type'] == "국내":
-                prompt += "\n- 바이크 전용: 고속도로 및 자동차 전용도로 절대 진입 금지."
+                prompt += "\n- 고속도로 및 자동차 전용도로 절대 진입 금지."
             if data.get('avoid_large_roads'):
-                prompt += "\n- 한적한 2차선 지방도/국도 위주 코스 구성 (4차선 대로 배제)."
+                prompt += "\n- 4차선 대로 배제, 2차선 지방도/국도 위주."
 
         if data['region_type'] == "국내":
             prompt += """
-        [링크 서식 규칙]
-        모든 주요 장소명(경유지, 식당, 숙소, 낚시 출항지) 바로 뒤에는 아래 형식으로 지도 링크를 반드시 첨부하세요:
-        - 형식: [네이버지도](https://map.naver.com/v5/search/{장소명}) | [카카오맵](https://map.kakao.com/link/search/{장소명})
+        [지도 링크 규칙]
+        주요 장소(식당, 숙소, 경유지, 출항지) 뒤에 반드시 아래 형식으로 링크 작성:
+        [네이버지도](https://map.naver.com/v5/search/{장소명}) | [카카오맵](https://map.kakao.com/link/search/{장소명})
             """
         else:
             prompt += """
-        [해외 링크 서식 규칙]
-        - 형식: [구글지도](https://www.google.com/maps/search/?api=1&query={장소명})
+        [지도 링크 규칙]
+        [구글지도](https://www.google.com/maps/search/?api=1&query={장소명})
             """
 
         prompt += """
-        [출력 구조]
+        [출력 양식]
         # {목적지} 맞춤 여행 일정 ({인원수}, {여행 기간})
         ## 1. 여행 코스 및 일정
-        ## 2. 현지 로컬 맛집 & 노포 추천
+        ## 2. 현지 로컬 맛집 & 노포
         ## 3. 가성비 숙소 추천
         ## 4. 선상 낚시 / 레저 정보
-        ## 5. 라이딩 & 여행 꿀팁
+        ## 5. 여행 & 라이딩 꿀팁
         """
 
         response = model.generate_content(prompt)
@@ -341,7 +346,6 @@ def download_pdf():
     text_content = request.form.get('text_content', '')
 
     buffer = io.BytesIO()
-    # A4 세로에 꽉 차도록 여백 최적화 (좌우 20pt, 상하 24pt)
     doc = SimpleDocTemplate(
         buffer,
         pagesize=A4,
@@ -391,14 +395,11 @@ def download_pdf():
             story.append(Spacer(1, 3))
             continue
 
-        # 마크다운 링크 [텍스트](URL) -> PDF 클릭 가능한 하이퍼링크 <link href="URL" color="#1a73e8"><u>텍스트</u></link> 변환
         line_str = re.sub(
             r'\[([^\]]+)\]\((https?://[^\)]+)\)',
             r'<link href="\2" color="#1a73e8"><u>\1</u></link>',
             line_str
         )
-        
-        # **볼드** -> <b>볼드</b>
         line_str = re.sub(r'\*\*(.*?)\*\*', r'<b>\1</b>', line_str)
 
         if line_str.startswith('# '):
