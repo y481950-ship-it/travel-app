@@ -98,7 +98,7 @@ if not st.session_state.plan_result:
             with st.spinner("최적의 여행 코스를 구성하고 있습니다..."):
                 try:
                     genai.configure(api_key=API_KEY)
-                    model = genai.GenerativeModel("gemini-2.5-flash")
+                    model = genai.GenerativeModel("gemini-3.6-flash")
                     
                     prompt = f"""
                     다음 조건으로 여행/라이딩 일정을 작성해줘.
@@ -169,3 +169,4 @@ else:
         if st.button("🔄 다시 설정하기"):
             st.session_state.plan_result = ""
             st.rerun()
+            
