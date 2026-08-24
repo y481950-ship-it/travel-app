@@ -311,7 +311,7 @@ def service_worker():
 @app.route('/manifest.json')
 def manifest():
     manifest_data = {
-        "name": "박영선의 AI 맞춤 여행 플래너",
+        "name": "박영선의 AI 여행 플래너",
         "short_name": "AI여행플래너",
         "start_url": "/",
         "display": "standalone",
@@ -338,10 +338,10 @@ def generate():
         data = request.get_json(force=True)
         genai.configure(api_key=API_KEY)
         
-        # 실시간 구글 검색(Search Grounding) 도구 장착
+        # 정식 Google Search Grounding 도구 적용
         model = genai.GenerativeModel(
             model_name="gemini-3.6-flash",
-            tools=['google_search']
+            tools=[{"google_search": {}}]
         )
 
         options = []
@@ -381,9 +381,9 @@ def generate():
             if data.get('avoid_large_roads'):
                 prompt += "- 4차선 대로 배제, 2차선 와인딩 및 한적한 국도/지방도 우선 코스 구성."
         else:
-            prompt += """
+            prompt += f"""
         [일반 여행 모드 규칙]
-        - 이동 경로의 불필요한 나열보다는 목적지({destination}) 현지에서 즐길 수 있는 관광 명소, 핫플레이스, 테마별 체험, 휴식 공간을 훨씬 풍부하고 알차게 구성할 것.
+        - 이동 경로의 불필요한 나열보다는 목적지({data.get('destination')}) 현지에서 즐길 수 있는 관광 명소, 핫플레이스, 테마별 체험, 휴식 공간을 훨씬 풍부하고 알차게 구성할 것.
         """
 
         if data.get('region_type') == "국내":
@@ -432,7 +432,7 @@ def download_pdf():
         genai.configure(api_key=API_KEY)
         model = genai.GenerativeModel(
             model_name="gemini-3.6-flash",
-            tools=['google_search']
+            tools=[{"google_search": {}}]
         )
 
         pdf_prompt = f"""
