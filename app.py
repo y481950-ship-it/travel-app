@@ -118,28 +118,28 @@ HTML_TEMPLATE = """
             <div class="checkbox-group">
                 <label><input type="checkbox" id="include_food" checked> 🍲 로컬 맛집/노포</label>
                 <label><input type="checkbox" id="include_stay" checked> 🛏️ 가성비 숙소(호텔/펜션)</label>
-                <label><input type="checkbox" id="include_fishing" checked> 🎣 선상 낚시(베테랑 선장)</label>
+                <label><input type="checkbox" id="include_activity" checked> 🏄 액티비티/이색체험</label>
+                <label><input type="checkbox" id="include_fishing" checked> 🎣 선상 낚시(베테랑 선단)</label>
             </div>
 
-            <div class="section-title">7. 여행 스타일 (중복 선택 가능)</div>
+            <div class="section-title">7. 여행 테마 & 분위기 (중복 선택)</div>
             <div class="checkbox-group">
                 <label><input type="checkbox" name="travel_style" value="자연/풍경 감상" checked> 🏞️ 자연/풍경</label>
-                <label><input type="checkbox" name="travel_style" value="맛집/카페 투어" checked> ☕ 맛집/카페</label>
-                <label><input type="checkbox" name="travel_style" value="관광지 탐방"> 🏛️ 관광지 탐방</label>
-                <label><input type="checkbox" name="travel_style" value="휴양/힐링"> 🧘 휴양/힐링</label>
-                <label><input type="checkbox" name="travel_style" value="이색 액티비티/체험"> 🏄 액티비티/체험</label>
+                <label><input type="checkbox" name="travel_style" value="맛집/카페 투어" checked> ☕ 맛집/디저트</label>
+                <label><input type="checkbox" name="travel_style" value="역사/관광지 탐방"> 🏛️ 명소/유적지</label>
+                <label><input type="checkbox" name="travel_style" value="휴양/힐링/온천"> 🧘 힐링/쉼</label>
             </div>
 
-            <div class="section-title">8. 경로 설정</div>
+            <div class="section-title">8. 이동 경로 설정</div>
             <div class="checkbox-group">
                 <label><input type="checkbox" id="is_bike_mode" checked onchange="toggleAvoidRoad()"> 🏍️ 바이크 전용 경로</label>
                 <label id="avoid_road_label"><input type="checkbox" id="avoid_large_roads" checked> 🚜 4차선 대로 완전 배제</label>
             </div>
 
-            <button type="button" id="submit-btn" onclick="generatePlan()">🚀 맞춤 일정 생성하기</button>
+            <button type="button" id="submit-btn" onclick="generatePlan()">🚀 실시간 맞춤 일정 생성하기</button>
         </form>
 
-        <div id="loading">⏳ 최적의 여행 코스와 추천 정보를 구성하고 있습니다...</div>
+        <div id="loading">⏳ 최신 실시간 정보를 검색하여 알찬 여행 계획을 구성하고 있습니다...</div>
 
         <div id="result-area">
             <div class="btn-group">
@@ -151,7 +151,6 @@ HTML_TEMPLATE = """
     </div>
 
     <script>
-        // PWA 서비스워커 등록
         if ('serviceWorker' in navigator) {
             navigator.serviceWorker.register('/sw.js');
         }
@@ -220,6 +219,7 @@ HTML_TEMPLATE = """
                 duration: document.querySelector('input[name="duration"]:checked').value,
                 include_food: document.getElementById('include_food').checked,
                 include_stay: document.getElementById('include_stay').checked,
+                include_activity: document.getElementById('include_activity').checked,
                 include_fishing: document.getElementById('include_fishing').checked,
                 is_bike_mode: isBike,
                 avoid_large_roads: avoidLargeRoads,
@@ -311,7 +311,7 @@ def service_worker():
 @app.route('/manifest.json')
 def manifest():
     manifest_data = {
-        "name": "박영선의 AI 여행 플래너",
+        "name": "박영선의 AI 맞춤 여행 플래너",
         "short_name": "AI여행플래너",
         "start_url": "/",
         "display": "standalone",
@@ -337,58 +337,77 @@ def generate():
     try:
         data = request.get_json(force=True)
         genai.configure(api_key=API_KEY)
-        model = genai.GenerativeModel("gemini-3.6-flash")
+        
+        # 실시간 구글 검색(Search Grounding) 도구 장착
+        model = genai.GenerativeModel(
+            model_name="gemini-3.6-flash",
+            tools=['google_search']
+        )
 
         options = []
         if data.get('include_food'):
-            options.append("- 로컬 맛집: 현지인 추천 찐 맛집/노포 2~3곳과 지도 링크")
+            options.append("- 로컬 맛집 & 노포: 현재 정상 영업 중인 현지인 찐 맛집 2~3곳 (대표메뉴, 가격, 영업시간, 지도링크)")
         if data.get('include_stay'):
-            options.append("- 가성비 숙소: 평점 높은 가성비 숙소 1~2곳과 지도 링크")
+            options.append("- 가성비 숙소: 최근 평점 우수 가성비 숙소/펜션/호텔 2곳 (특징, 1박 예상요금, 지도링크)")
+        if data.get('include_activity'):
+            options.append("- 목적지 액티비티/이색체험: 현지에서 현재 운영 중인 인기 레저/체험/투어 프로그램 (소요시간, 1인 비용, 지도링크)")
         if data.get('include_fishing'):
-            options.append("- 선상 낚시: 바다권일 경우 검증된 선단/선장님 정보와 지도 링크")
+            options.append("- 선상 낚시: (해안/바다권일 경우) 최근 조황 우수한 베테랑 선단/선장님 정보와 출항지 지도링크")
 
         options_text = "\n".join(options)
 
         prompt = f"""
-        당신은 베테랑 여행/라이딩 플래너입니다. 사용자가 화면에서 볼 수 있도록 상세한 여행 코스와 장소 정보를 작성해주세요.
+        당신은 국내외 최고 권위의 실시간 여행 전문 가이드입니다. 
+        반드시 실시간 검색 기능을 사용하여 폐업하지 않고 현재 실제 운영 중인 최신 정보만을 바탕으로 일정을 구성하세요.
 
-        [조건]
-        - 지역: {data.get('region_type')} | 출발지: {data.get('start_location')} | 목적지: {data.get('destination')}
-        - 인원: {data.get('headcount')} | 일정: {data.get('duration')}
-        - 스타일: {data.get('styles')}
+        [여행 조건]
+        - 구분: {data.get('region_type')}
+        - 출발지: {data.get('start_location')}
+        - 목적지: {data.get('destination')}
+        - 인원수: {data.get('headcount')}
+        - 기간: {data.get('duration')}
+        - 테마: {data.get('styles')}
 
-        [필수 추천]
+        [필수 포함 상세 정보]
         {options_text}
-
-        [주행 규칙]
-        - 출발지 인근 경유지는 제외하고 목적지 방향으로 최소 1시간 주행 후 첫 경유지가 나오게 구성.
         """
 
         if data.get('is_bike_mode'):
-            if data.get('region_type') == "국내":
-                prompt += "\n- 바이크 전용: 고속도로 및 자동차 전용도로 절대 진입 금지."
+            prompt += """
+        [바이크 투어 전용 규칙]
+        - 고속도로 및 자동차 전용도로 절대 진입 금지.
+        - 출발지 인근 경유지는 제외하고 목적지 방향으로 최소 1시간 달린 후 첫 경유지가 나오도록 구성.
+        """
             if data.get('avoid_large_roads'):
-                prompt += "\n- 4차선 대로 배제, 2차선 지방도/국도 위주."
+                prompt += "- 4차선 대로 배제, 2차선 와인딩 및 한적한 국도/지방도 우선 코스 구성."
+        else:
+            prompt += """
+        [일반 여행 모드 규칙]
+        - 이동 경로의 불필요한 나열보다는 목적지({destination}) 현지에서 즐길 수 있는 관광 명소, 핫플레이스, 테마별 체험, 휴식 공간을 훨씬 풍부하고 알차게 구성할 것.
+        """
 
         if data.get('region_type') == "국내":
             prompt += """
-        [지도 링크]
-        주요 장소명 뒤에 필수 표기: [네이버지도](https://map.naver.com/v5/search/{장소명}) | [카카오맵](https://map.kakao.com/link/search/{장소명})
+        [지도 링크 규칙 - 필수]
+        모든 추천 장소명 뒤에 실시간 검색용 지도 링크를 반드시 삽입하세요:
+        [네이버지도](https://map.naver.com/v5/search/{장소명}) | [카카오맵](https://map.kakao.com/link/search/{장소명})
             """
         else:
             prompt += """
-        [지도 링크]
+        [지도 링크 규칙 - 필수]
+        모든 추천 장소명 뒤에 구글 지도 링크를 삽입하세요:
         [구글지도](https://www.google.com/maps/search/?api=1&query={장소명})
             """
 
-        prompt += """
+        prompt += f"""
         [출력 양식]
-        # {목적지} 맞춤 여행 코스 및 일정 ({인원수}, {여행 기간})
-        ## 1. 여행 코스 및 세부 일정
-        ## 2. 현지 로컬 맛집 & 노포
-        ## 3. 가성비 숙소 추천
-        ## 4. 선상 낚시 / 추천 액티비티
-        ## 5. 여행 & 라이딩 꿀팁
+        # {data.get('destination')} 맞춤 여행 코스 & 실시간 추천 정보 ({data.get('headcount')}, {data.get('duration')})
+        ## 1. 최적 여행 코스 및 상세 일정
+        ## 2. 현지 실시간 검증 로컬 맛집 & 노포
+        ## 3. 추천 가성비 숙소
+        ## 4. 목적지 액티비티 & 이색 체험
+        ## 5. 선상 낚시 & 해양 레저 (해당 시)
+        ## 6. 현지 최신 여행/라이딩 꿀팁 & 주의사항
         """
 
         response = model.generate_content(prompt)
@@ -411,10 +430,13 @@ def download_pdf():
         styles = request.form.get('styles', '자유 여행')
 
         genai.configure(api_key=API_KEY)
-        model = genai.GenerativeModel("gemini-3.6-flash")
+        model = genai.GenerativeModel(
+            model_name="gemini-3.6-flash",
+            tools=['google_search']
+        )
 
         pdf_prompt = f"""
-        여행 정산 및 정보 요약 전문가로서, 아래 조건에 맞춰 PDF 인쇄용 [여행 견적 및 핵심 추천 요약서]를 작성해주세요.
+        여행 정산 및 정보 요약 전문가로서, 아래 조건에 맞춰 PDF 인쇄용 [여행 견적 및 핵심 추천 요약서]를 실시간 검색을 바탕으로 작성하세요.
         *주의: 지루한 경유지나 이동 코스는 완전히 제외하고, 경비 정산표와 핵심 장소(숙소/맛집/체험) 정보만 명확히 작성하세요.*
 
         [조건]
@@ -434,13 +456,13 @@ def download_pdf():
         - [1인당 총 예상 경비]: OOO원
         - [{headcount} 전체 총 예상 경비]: OOO원
 
-        ## 2. 엄선 로컬 맛집
+        ## 2. 실시간 엄선 로컬 맛집
         - [식당명]: 대표메뉴 및 특징, 1인당 예상 가격
 
         ## 3. 추천 가성비 숙소 (당일치기면 생략 또는 주변 쉼터)
         - [숙소명]: 객실 특징, 가성비 포인트, 예상 1박 요금
 
-        ## 4. 추천 액티비티 & 선상 낚시
+        ## 4. 목적지 대표 액티비티 & 선상 낚시
         - [프로그램/선단명]: 특징, 소요시간, 1인 체험비
         """
 
