@@ -281,7 +281,7 @@ HTML_TEMPLATE = """
                 try {
                     data = JSON.parse(text);
                 } catch(e) {
-                    alert('서버 처리 지연: 다시 한 번 눌러주세요.');
+                    alert('서버 응답 파싱 실패: 잠시 후 다시 시도해주세요.');
                     resetForm();
                     return;
                 }
@@ -379,36 +379,35 @@ def generate():
         genai.configure(api_key=API_KEY)
         model = genai.GenerativeModel("gemini-3.6-flash")
 
-        # 체크된 옵션만 선별
         options = []
-        output_sections = ["## 1. 최적 라이딩/여행 코스 (카카오맵 입력용 촘촘한 경유지)"]
+        output_sections = ["## 1. 최적 라이딩/여행 코스 (카카오맵 네비 입력용 촘촘한 경유지 포함)"]
         sec_num = 2
 
         if data.get('include_food'):
-            options.append("- 로컬 맛집: 현지인 추천 찐 맛집/노포 2곳 및 카카오맵 링크")
+            options.append("- 로컬 맛집: 현지인 추천 맛집/노포 2~3곳과 카카오맵 링크")
             output_sections.append(f"## {sec_num}. 현지 로컬 맛집 & 노포")
             sec_num += 1
         if data.get('include_stay'):
-            options.append("- 가성비 숙소: 평점 높은 추천 숙소 1~2곳 및 카카오맵 링크")
+            options.append("- 가성비 숙소: 평점 높은 추천 숙소 1~2곳과 카카오맵 링크")
             output_sections.append(f"## {sec_num}. 추천 숙소")
             sec_num += 1
         if data.get('include_activity'):
-            options.append("- 액티비티: 현지 대표 레저 체험 및 카카오맵 링크")
+            options.append("- 액티비티/체험: 대표 레저 및 이색 체험과 카카오맵 링크")
             output_sections.append(f"## {sec_num}. 액티비티 & 이색 체험")
             sec_num += 1
         if data.get('include_fishing'):
-            options.append("- 선상 낚시: 바다권일 경우 추천 선단 및 카카오맵 링크")
+            options.append("- 선상 낚시: 바다권일 경우 선단 정보와 카카오맵 링크")
             output_sections.append(f"## {sec_num}. 선상 낚시")
             sec_num += 1
 
-        output_sections.append(f"## {sec_num}. 라이딩 꿀팁 및 코너링 주의구간")
+        output_sections.append(f"## {sec_num}. 라이딩/여행 꿀팁 및 코너링 주의구간")
 
-        options_text = "\n".join(options) if options else "기본 여행지 중심 코스"
+        options_text = "\n".join(options) if options else "기본 코스 위주 안내"
         output_format_text = "\n".join(output_sections)
 
         prompt = f"""
-        당신은 대한민국 바이크 투어링 및 여행 기획 전문가입니다. 네비게이션은 **카카오맵** 기준입니다.
-        *주의: 체크되지 않은 항목은 일절 작성하지 마세요.*
+        당신은 대한민국 최고의 바이크 투어링 및 여행 기획 전문가입니다. 네비게이션은 **카카오맵**입니다.
+        *주의: 체크 해제된 항목은 절대 작성하지 마세요.*
 
         [조건]
         - 지역: {data.get('region_type')} | 출발지: {data.get('start_location')} | 목적지: {data.get('destination')}
@@ -421,8 +420,8 @@ def generate():
         if data.get('is_bike_mode'):
             prompt += """
         [바이크 전용 경로 규칙 - 카카오맵 최적화]
-        1. 고속도로 및 자동차 전용도로 절대 금지.
-        2. 첫 경유지는 출발지에서 최소 50분~1시간 주행한 지점부터 지정.
+        1. 자동차 전용도로 및 고속도로 절대 금지.
+        2. 출발 직후 첫 경유지는 출발지에서 최소 50분~1시간 주행한 지점부터 지정.
         3. 카카오맵 검색창에 바로 입력 가능한 구체적 지명(교차로/삼거리명, 고개/재/령 정상 휴게소) 명시.
         """
             if data.get('avoid_large_roads'):
@@ -432,7 +431,7 @@ def generate():
         else:
             prompt += f"""
         [일반 모드 규칙]
-        - 목적지({data.get('destination')}) 현지의 명소 위주로 구성.
+        - 목적지({data.get('destination')}) 현지의 명소 및 코스 위주로 구성.
         """
 
         if data.get('region_type') == "국내":
@@ -452,11 +451,7 @@ def generate():
         {output_format_text}
         """
 
-        # 속도 최적화로 타임아웃 차단
-        response = model.generate_content(
-            prompt,
-            generation_config={"max_output_tokens": 1500, "temperature": 0.7}
-        )
+        response = model.generate_content(prompt)
         raw_text = response.text
         html_text = markdown_to_html(raw_text)
 
@@ -490,10 +485,7 @@ def download_pdf():
         ## 2. 엄선 맛집 / 숙소 / 액티비티 요약
         """
 
-        res = model.generate_content(
-            pdf_prompt,
-            generation_config={"max_output_tokens": 1000, "temperature": 0.7}
-        )
+        res = model.generate_content(pdf_prompt)
         pdf_text = res.text
 
         buffer = io.BytesIO()
