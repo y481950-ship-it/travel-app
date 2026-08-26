@@ -169,7 +169,7 @@ HTML_TEMPLATE = """
                     const lon = pos.coords.longitude;
                     try {
                         const controller = new AbortController();
-                        const tId = setTimeout(() => controller.abort(), 3500);
+                        const tId = setTimeout(() => controller.abort(), 3000);
                         const res = await fetch(`https://nominatim.openstreetmap.org/reverse?format=json&lat=${lat}&lon=${lon}&accept-language=ko`, { signal: controller.signal });
                         clearTimeout(tId);
                         const data = await res.json();
@@ -192,7 +192,7 @@ HTML_TEMPLATE = """
                 }, () => {
                     detectedAddress = "현재 위치";
                     document.getElementById('gps-info').innerText = "📍 현재 위치";
-                }, { timeout: 4000 });
+                }, { timeout: 3500 });
             }
         }
 
@@ -292,7 +292,7 @@ HTML_TEMPLATE = """
                 document.getElementById('result-area').style.display = 'block';
                 window.scrollTo({ top: 0, behavior: 'smooth' });
             } catch (err) {
-                alert('요청 처리 중 오류가 발생했습니다. 잠시 후 다시 시도해주세요.');
+                alert('요청 처리 오류: ' + (err.message || '서버 응답 시간 초과'));
                 resetForm();
             }
         }
@@ -382,34 +382,34 @@ def generate():
         styles = data.get('styles', '자유 여행')
 
         options = []
-        output_sections = ["## 1. 최적 라이딩/여행 코스 (카카오맵 네비 입력용 촘촘한 경유지 포함)"]
+        output_sections = ["## 1. 최적 코스 (카카오맵 경유지)"]
         sec_num = 2
 
         if data.get('include_food'):
-            options.append("- 로컬 맛집: 현지인 추천 맛집/노포 2~3곳과 카카오맵 링크")
-            output_sections.append(f"## {sec_num}. 현지 로컬 맛집 & 노포")
+            options.append("- 로컬 맛집 2곳 (카카오맵 링크 포함)")
+            output_sections.append(f"## {sec_num}. 현지 맛집 & 노포")
             sec_num += 1
         if data.get('include_stay'):
-            options.append("- 가성비 숙소: 평점 높은 추천 숙소 1~2곳과 카카오맵 링크")
+            options.append("- 가성비 숙소 1곳 (카카오맵 링크 포함)")
             output_sections.append(f"## {sec_num}. 추천 숙소")
             sec_num += 1
         if data.get('include_activity'):
-            options.append("- 액티비티/체험: 대표 레저 및 이색 체험과 카카오맵 링크")
-            output_sections.append(f"## {sec_num}. 액티비티 & 이색 체험")
+            options.append("- 액티비티/체험 1곳 (카카오맵 링크 포함)")
+            output_sections.append(f"## {sec_num}. 추천 체험")
             sec_num += 1
         if data.get('include_fishing'):
-            options.append("- 선상 낚시: 바다권일 경우 선단 정보와 카카오맵 링크")
+            options.append("- 선상 낚시 1곳 (카카오맵 링크 포함)")
             output_sections.append(f"## {sec_num}. 선상 낚시")
             sec_num += 1
 
-        output_sections.append(f"## {sec_num}. 라이딩/여행 꿀팁 및 코너링 주의구간")
+        output_sections.append(f"## {sec_num}. 주행 팁 및 주의구간")
 
-        options_text = "\n".join(options) if options else "기본 코스 위주 안내"
+        options_text = "\n".join(options) if options else "기본 경로 위주"
         output_format_text = "\n".join(output_sections)
 
         prompt = f"""
-        당신은 대한민국 최고의 바이크 투어링 및 여행 기획 전문가입니다. 네비게이션은 **카카오맵**입니다.
-        *주의: 체크 해제된 항목은 절대 작성하지 마세요.*
+        대한민국 바이크 투어링/여행 전문가로서 핵심만 군더더기 없이 간결하게 작성하세요.
+        *주의: 체크 해제된 항목은 본문에 아예 적지 마세요.*
 
         [조건]
         - 지역: {region_type} | 출발지: {start_location} | 목적지: {destination}
@@ -421,25 +421,25 @@ def generate():
 
         if data.get('is_bike_mode'):
             prompt += """
-        [바이크 전용 경로 규칙 - 카카오맵 최적화]
-        1. 자동차 전용도로 및 고속도로 절대 금지.
-        2. 출발 직후 첫 경유지는 출발지에서 최소 50분~1시간 주행한 지점부터 지정.
-        3. 카카오맵 검색창에 바로 입력 가능한 구체적 지명(교차로/삼거리명, 고개/재/령 정상 휴게소) 명시.
+        [경로 규칙 - 카카오맵 최적화]
+        - 고속도로/자동차 전용도로 절대 제외.
+        - 첫 경유지는 출발 50분 후 지점부터.
+        - 카카오맵에 칠 수 있는 교차로/삼거리/고개 정상 명칭 명시.
         """
             if data.get('avoid_large_roads'):
                 prompt += """
-        4. [4차선 국도 배제]: 네비가 4차선 직선 국도로 빠지지 않도록 4차선 합류 전 '옛길 입구 삼거리', '회전교차로', '2차선 계곡/강변 지방도'를 방어 경유지로 촘촘히 지정.
+        - 4차선 직선국도 피하고 2차선 지방도/옛길 경유지를 촘촘히 넣을 것.
         """
         else:
             prompt += f"""
-        [일반 모드 규칙]
-        - 목적지({destination}) 현지의 명소 및 코스 위주로 구성.
+        [일반 모드]
+        - 목적지({destination}) 명소 코스 중심 간결 작성.
         """
 
         if region_type == "국내":
             prompt += """
         [지도 링크]
-        주요 장소명 뒤: [카카오맵](https://map.kakao.com/link/search/{장소명}) | [네이버지도](https://map.naver.com/v5/search/{장소명})
+        주요 장소명: [카카오맵](https://map.kakao.com/link/search/{장소명}) | [네이버지도](https://map.naver.com/v5/search/{장소명})
             """
         else:
             prompt += """
@@ -449,11 +449,14 @@ def generate():
 
         prompt += f"""
         [출력 양식]
-        # {destination} 맞춤 여행 코스 ({headcount}, {duration})
+        # {destination} 여행 코스 ({headcount}, {duration})
         {output_format_text}
         """
 
-        response = model.generate_content(prompt)
+        response = model.generate_content(
+            prompt,
+            generation_config={"max_output_tokens": 2048, "temperature": 0.6}
+        )
         raw_text = response.text
         html_text = markdown_to_html(raw_text)
 
@@ -476,7 +479,7 @@ def download_pdf():
         model = genai.GenerativeModel("gemini-3.6-flash")
 
         pdf_prompt = f"""
-        PDF 인쇄용 [여행 견적 및 핵심 요약서]를 간결히 작성하세요. 이동 코스는 제외하고 정산표와 핵심 장소만 적으세요.
+        PDF 인쇄용 [여행 견적서]를 간결히 요약 작성하세요.
         - 목적지: {destination} | 인원: {headcount} | 일정: {duration} | 스타일: {styles}
 
         # {destination} 여행 핵심 견적서 ({headcount}, {duration})
@@ -484,10 +487,13 @@ def download_pdf():
         - 식비/숙박비/체험비/교통비 항목별 산출
         - [1인당 총 예상 경비]: OOO원
         - [{headcount} 전체 총 예상 경비]: OOO원
-        ## 2. 엄선 맛집 / 숙소 / 액티비티 요약
+        ## 2. 엄선 장소 핵심 요약
         """
 
-        res = model.generate_content(pdf_prompt)
+        res = model.generate_content(
+            pdf_prompt,
+            generation_config={"max_output_tokens": 1000, "temperature": 0.6}
+        )
         pdf_text = res.text
 
         buffer = io.BytesIO()
