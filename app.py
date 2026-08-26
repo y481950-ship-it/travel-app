@@ -163,30 +163,30 @@ HTML_TEMPLATE = """
         function requestCurrentLocation() {
             if ("geolocation" in navigator) {
                 const infoEl = document.getElementById('gps-info');
-                infoEl.innerText = "🛰️ 현재 위치 확인 중...";
+                infoEl.innerText = "🛰️ 현재 위치 파악 중...";
                 navigator.geolocation.getCurrentPosition(async (pos) => {
                     const lat = pos.coords.latitude;
                     const lon = pos.coords.longitude;
                     try {
                         const controller = new AbortController();
-                        const timeoutId = setTimeout(() => controller.abort(), 4000);
+                        const tId = setTimeout(() => controller.abort(), 3500);
                         const res = await fetch(`https://nominatim.openstreetmap.org/reverse?format=json&lat=${lat}&lon=${lon}&accept-language=ko`, { signal: controller.signal });
-                        clearTimeout(timeoutId);
+                        clearTimeout(tId);
                         const data = await res.json();
                         const addr = data.address || {};
                         const province = addr.province || addr.city || addr.state || "";
                         const city = addr.city || addr.county || addr.district || "";
                         const town = addr.town || addr.village || addr.suburb || "";
                         detectedAddress = `${province} ${city} ${town}`.trim();
-                        infoEl.innerText = detectedAddress ? `📍 현재 위치: ${detectedAddress}` : "📍 현재 위치 확인 완료";
+                        infoEl.innerText = detectedAddress ? `📍 감지된 위치: ${detectedAddress}` : "📍 현재 위치 확인 완료";
                     } catch(e) {
                         detectedAddress = "현재 위치";
                         infoEl.innerText = "📍 현재 위치 확인 완료";
                     }
                 }, () => {
                     detectedAddress = "현재 위치";
-                    document.getElementById('gps-info').innerText = "📍 현재 위치";
-                }, { timeout: 5000 });
+                    document.getElementById('gps-info').innerText = "📍 현재 위치 (권한 미허용)";
+                }, { timeout: 4000 });
             }
         }
 
@@ -276,7 +276,15 @@ HTML_TEMPLATE = """
                     body: JSON.stringify(currentPayload)
                 });
                 
-                const data = await res.json();
+                const text = await res.text();
+                let data;
+                try {
+                    data = JSON.parse(text);
+                } catch(e) {
+                    alert('서버 처리 지연: 다시 한 번 눌러주세요.');
+                    resetForm();
+                    return;
+                }
                 
                 if (!res.ok || data.error) {
                     alert(data.error || '생성 중 오류가 발생했습니다.');
@@ -289,7 +297,7 @@ HTML_TEMPLATE = """
                 document.getElementById('result-area').style.display = 'block';
                 window.scrollTo({ top: 0, behavior: 'smooth' });
             } catch (err) {
-                alert('연결 에러: ' + err.message);
+                alert('연결 오류가 발생했습니다. 다시 시도해주세요.');
                 resetForm();
             }
         }
@@ -371,54 +379,66 @@ def generate():
         genai.configure(api_key=API_KEY)
         model = genai.GenerativeModel("gemini-3.6-flash")
 
+        # 체크된 옵션만 선별
         options = []
-        if data.get('include_food'):
-            options.append("- 로컬 맛집: 현지인 추천 찐 맛집/노포 2~3곳과 지도 링크")
-        if data.get('include_stay'):
-            options.append("- 가성비 숙소: 평점 높은 가성비 숙소 1~2곳과 지도 링크")
-        if data.get('include_activity'):
-            options.append("- 액티비티/체험: 현지 대표 레저 및 이색 체험과 지도 링크")
-        if data.get('include_fishing'):
-            options.append("- 선상 낚시: 바다권일 경우 검증된 선단 정보와 지도 링크")
+        output_sections = ["## 1. 최적 라이딩/여행 코스 (카카오맵 입력용 촘촘한 경유지)"]
+        sec_num = 2
 
-        options_text = "\n".join(options)
+        if data.get('include_food'):
+            options.append("- 로컬 맛집: 현지인 추천 찐 맛집/노포 2곳 및 카카오맵 링크")
+            output_sections.append(f"## {sec_num}. 현지 로컬 맛집 & 노포")
+            sec_num += 1
+        if data.get('include_stay'):
+            options.append("- 가성비 숙소: 평점 높은 추천 숙소 1~2곳 및 카카오맵 링크")
+            output_sections.append(f"## {sec_num}. 추천 숙소")
+            sec_num += 1
+        if data.get('include_activity'):
+            options.append("- 액티비티: 현지 대표 레저 체험 및 카카오맵 링크")
+            output_sections.append(f"## {sec_num}. 액티비티 & 이색 체험")
+            sec_num += 1
+        if data.get('include_fishing'):
+            options.append("- 선상 낚시: 바다권일 경우 추천 선단 및 카카오맵 링크")
+            output_sections.append(f"## {sec_num}. 선상 낚시")
+            sec_num += 1
+
+        output_sections.append(f"## {sec_num}. 라이딩 꿀팁 및 코너링 주의구간")
+
+        options_text = "\n".join(options) if options else "기본 여행지 중심 코스"
+        output_format_text = "\n".join(output_sections)
 
         prompt = f"""
-        당신은 대한민국 최고의 바이크 투어링 및 여행 코스 기획 전문가입니다.
-        사용자는 **카카오맵 네비게이션**을 단독으로 사용합니다.
+        당신은 대한민국 바이크 투어링 및 여행 기획 전문가입니다. 네비게이션은 **카카오맵** 기준입니다.
+        *주의: 체크되지 않은 항목은 일절 작성하지 마세요.*
 
         [조건]
         - 지역: {data.get('region_type')} | 출발지: {data.get('start_location')} | 목적지: {data.get('destination')}
         - 인원: {data.get('headcount')} | 일정: {data.get('duration')} | 스타일: {data.get('styles')}
 
-        [필수 추천]
+        [포함 요청 항목]
         {options_text}
         """
 
         if data.get('is_bike_mode'):
             prompt += """
-        [바이크 전용 경로 규칙 - 카카오맵 최적화 & 4차선 원천 차단 지침]
-        1. 자동차 전용도로 및 고속도로 절대 금지.
-        2. 출발 직후 첫 경유지는 출발지 바로 앞이 아닌, 목적지 방향으로 최소 50분~1시간 주행한 지점부터 지정할 것.
-        3. 카카오맵 검색창에 바로 입력할 수 있도록 정확한 **[카카오맵 검색용 명칭]**(정확한 교차로/삼거리명, 고개/재/령 정상 휴게소, 랜드마크 지번)을 번호순으로 명시할 것.
+        [바이크 전용 경로 규칙 - 카카오맵 최적화]
+        1. 고속도로 및 자동차 전용도로 절대 금지.
+        2. 첫 경유지는 출발지에서 최소 50분~1시간 주행한 지점부터 지정.
+        3. 카카오맵 검색창에 바로 입력 가능한 구체적 지명(교차로/삼거리명, 고개/재/령 정상 휴게소) 명시.
         """
             if data.get('avoid_large_roads'):
                 prompt += """
-        4. [4차선 국도/대로 완전 배제 & 촘촘한 갈림길 경유지 필수]:
-           - 카카오맵 네비가 4차선 직선 국도(예: 6번, 42번, 44번, 7번 등)나 터널로 길을 틀지 못하도록, **4차선 합류 직전의 '옛길(구길) 입구 삼거리', '회전교차로', '2차선 지방도 진입로', '해안 안길'**을 촘촘하게 방어 경유지로 반드시 꽂아줄 것.
-           - 지루한 4차선 대신 바이커들이 선호하는 **2차선 강변/계곡 지방도, 숨겨진 고갯길 와인딩 코스**만 연결할 것.
-           - 각 경유지마다 [카카오맵 입력 지점명]과 [해당 도로의 라이딩 포인트]를 함께 적을 것.
+        4. [4차선 국도 배제]: 네비가 4차선 직선 국도로 빠지지 않도록 4차선 합류 전 '옛길 입구 삼거리', '회전교차로', '2차선 계곡/강변 지방도'를 방어 경유지로 촘촘히 지정.
         """
         else:
             prompt += f"""
         [일반 모드 규칙]
-        - 목적지({data.get('destination')}) 현지의 명소, 체험, 맛집 위주로 알차게 구성.
+        - 목적지({data.get('destination')}) 현지의 명소 위주로 구성.
         """
 
         if data.get('region_type') == "국내":
             prompt += """
         [지도 링크]
-        주요 장소명 및 경유지명 뒤에 카카오맵 링크를 필수로 생성: [카카오맵](https://map.kakao.com/link/search/{장소명}) | [네이버지도](https://map.naver.com/v5/search/{장소명})
+        주요 장소명 뒤: [카카오맵](https://map.kakao.com/link/search/{장소명}) | [네이버지도](https://map.naver.com/v5/search/{장소명})
             """
         else:
             prompt += """
@@ -429,15 +449,14 @@ def generate():
         prompt += f"""
         [출력 양식]
         # {data.get('destination')} 맞춤 여행 코스 ({data.get('headcount')}, {data.get('duration')})
-        ## 1. 최적 라이딩/여행 코스 (카카오맵 네비 입력용 촘촘한 경유지 포함)
-        ## 2. 현지 로컬 맛집 & 노포
-        ## 3. 추천 숙소
-        ## 4. 액티비티 & 이색 체험
-        ## 5. 선상 낚시 (해당 시)
-        ## 6. 라이딩/여행 꿀팁 및 코너링 주의구간
+        {output_format_text}
         """
 
-        response = model.generate_content(prompt)
+        # 속도 최적화로 타임아웃 차단
+        response = model.generate_content(
+            prompt,
+            generation_config={"max_output_tokens": 1500, "temperature": 0.7}
+        )
         raw_text = response.text
         html_text = markdown_to_html(raw_text)
 
@@ -446,7 +465,7 @@ def generate():
         err_msg = str(e)
         if "429" in err_msg or "Quota exceeded" in err_msg or "RESOURCE_EXHAUSTED" in err_msg:
             return jsonify({'error': '⚠️ 오늘 무료 AI 사용량(20회)이 모두 소진되었습니다.\n한국 시간 기준 내일 오후 4시에 자동 초기화됩니다.'}), 429
-        return jsonify({'error': f'구글 API 오류: {err_msg}'}), 500
+        return jsonify({'error': f'API 오류: {err_msg}'}), 500
 
 @app.route('/download_pdf', methods=['POST'])
 def download_pdf():
@@ -471,7 +490,10 @@ def download_pdf():
         ## 2. 엄선 맛집 / 숙소 / 액티비티 요약
         """
 
-        res = model.generate_content(pdf_prompt)
+        res = model.generate_content(
+            pdf_prompt,
+            generation_config={"max_output_tokens": 1000, "temperature": 0.7}
+        )
         pdf_text = res.text
 
         buffer = io.BytesIO()
