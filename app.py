@@ -344,7 +344,8 @@ def generate():
         options_text = "\n".join(options)
 
         prompt = f"""
-        당신은 베테랑 바이크 투어링 및 여행 코스 기획 전문가입니다.
+        당신은 대한민국 최고의 바이크 투어링 및 여행 코스 기획 전문가입니다.
+        사용자는 **카카오맵 네비게이션**을 단독으로 사용합니다.
 
         [조건]
         - 지역: {data.get('region_type')} | 출발지: {data.get('start_location')} | 목적지: {data.get('destination')}
@@ -356,12 +357,18 @@ def generate():
 
         if data.get('is_bike_mode'):
             prompt += """
-        [바이크 전용 경로 규칙]
-        - 고속도로 및 자동차 전용도로 절대 금지.
-        - 네비게이션(카카오맵/티맵)에 입력할 구체적 경유지(고개/재/령, 삼거리, 지방도 번호)를 번호순으로 명확히 제시.
+        [바이크 전용 경로 규칙 - 카카오맵 최적화 & 4차선 원천 차단 지침]
+        1. 자동차 전용도로 및 고속도로 절대 금지.
+        2. 출발 직후 첫 경유지는 출발지 바로 앞이 아닌, 목적지 방향으로 최소 50분~1시간 주행한 지점부터 지정할 것.
+        3. 카카오맵 검색창에 바로 입력할 수 있도록 정확한 **[카카오맵 검색용 명칭]**(정확한 교차로/삼거리명, 고개/재/령 정상 휴게소, 랜드마크 지번)을 번호순으로 명시할 것.
         """
             if data.get('avoid_large_roads'):
-                prompt += "- 4차선 직선 국도 배제. 바이커 선호 2차선 와인딩 구길/지방도 위주 경유지 연결.\n"
+                prompt += """
+        4. [4차선 국도/대로 완전 배제 & 촘촘한 갈림길 경유지 필수]:
+           - 카카오맵 네비가 4차선 직선 국도(예: 6번, 42번, 44번, 7번 등)나 터널로 길을 틀지 못하도록, **4차선 합류 직전의 '옛길(구길) 입구 삼거리', '회전교차로', '2차선 지방도 진입로', '해안 안길'**을 촘촘하게 방어 경유지로 반드시 꽂아줄 것.
+           - 지루한 4차선 대신 바이커들이 선호하는 **2차선 강변/계곡 지방도, 숨겨진 고갯길 와인딩 코스**만 연결할 것.
+           - 각 경유지마다 [카카오맵 입력 지점명]과 [해당 도로의 라이딩 포인트]를 함께 적을 것.
+        """
         else:
             prompt += f"""
         [일반 모드 규칙]
@@ -371,7 +378,7 @@ def generate():
         if data.get('region_type') == "국내":
             prompt += """
         [지도 링크]
-        주요 장소명 뒤: [네이버지도](https://map.naver.com/v5/search/{장소명}) | [카카오맵](https://map.kakao.com/link/search/{장소명})
+        주요 장소명 및 경유지명 뒤에 카카오맵 링크를 필수로 생성: [카카오맵](https://map.kakao.com/link/search/{장소명}) | [네이버지도](https://map.naver.com/v5/search/{장소명})
             """
         else:
             prompt += """
@@ -382,12 +389,12 @@ def generate():
         prompt += f"""
         [출력 양식]
         # {data.get('destination')} 맞춤 여행 코스 ({data.get('headcount')}, {data.get('duration')})
-        ## 1. 최적 라이딩/여행 코스 (네비 입력용 경유지 포함)
+        ## 1. 최적 라이딩/여행 코스 (카카오맵 네비 입력용 촘촘한 경유지 포함)
         ## 2. 현지 로컬 맛집 & 노포
         ## 3. 추천 숙소
         ## 4. 액티비티 & 이색 체험
         ## 5. 선상 낚시 (해당 시)
-        ## 6. 라이딩/여행 꿀팁
+        ## 6. 라이딩/여행 꿀팁 및 코너링 주의구간
         """
 
         response = model.generate_content(prompt)
@@ -486,6 +493,9 @@ def download_pdf():
             elif line_str.startswith('## '):
                 clean_h2 = re.sub(r'^##\s*', '', safe_text)
                 story.append(Paragraph(clean_h2, h2_style))
+            elif line_str.startswith('### '):
+                clean_h3 = re.sub(r'^###\s*', '', safe_text)
+                story.append(Paragraph(clean_h3, h2_style))
             else:
                 story.append(Paragraph(safe_text, body_style))
 
