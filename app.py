@@ -236,15 +236,7 @@ HTML_TEMPLATE = """
                     body: JSON.stringify(currentPayload)
                 });
                 
-                const text = await res.text();
-                let data;
-                try {
-                    data = JSON.parse(text);
-                } catch(e) {
-                    alert('서버가 준비 중입니다. 잠시 후 다시 눌러주세요.');
-                    resetForm();
-                    return;
-                }
+                const data = await res.json();
                 
                 if (!res.ok || data.error) {
                     alert(data.error || '생성 중 오류가 발생했습니다.');
@@ -257,7 +249,7 @@ HTML_TEMPLATE = """
                 document.getElementById('result-area').style.display = 'block';
                 window.scrollTo({ top: 0, behavior: 'smooth' });
             } catch (err) {
-                alert('연결 오류: 잠시 후 다시 시도해주세요.');
+                alert('서버 응답 오류: 잠시 후 다시 시도해주세요.');
                 resetForm();
             }
         }
@@ -337,7 +329,7 @@ def generate():
     try:
         data = request.get_json(force=True)
         genai.configure(api_key=API_KEY)
-        model = genai.GenerativeModel("gemini-3.6-flash")
+        model = genai.GenerativeModel("gemini-2.5-flash")
 
         options = []
         if data.get('include_food'):
@@ -345,19 +337,18 @@ def generate():
         if data.get('include_stay'):
             options.append("- 가성비 숙소: 평점 높은 가성비 숙소 1~2곳과 지도 링크")
         if data.get('include_activity'):
-            options.append("- 액티비티/체험: 현지에서 즐길 수 있는 대표 레저 및 이색 체험과 지도 링크")
+            options.append("- 액티비티/체험: 현지 대표 레저 및 이색 체험과 지도 링크")
         if data.get('include_fishing'):
-            options.append("- 선상 낚시: 바다권일 경우 검증된 선단/선장님 정보와 지도 링크")
+            options.append("- 선상 낚시: 바다권일 경우 검증된 선단 정보와 지도 링크")
 
         options_text = "\n".join(options)
 
         prompt = f"""
-        당신은 국내 최고 권위의 바이크 투어링 및 여행 코스 기획 전문가입니다.
+        당신은 베테랑 바이크 투어링 및 여행 코스 기획 전문가입니다.
 
         [조건]
         - 지역: {data.get('region_type')} | 출발지: {data.get('start_location')} | 목적지: {data.get('destination')}
-        - 인원: {data.get('headcount')} | 일정: {data.get('duration')}
-        - 스타일: {data.get('styles')}
+        - 인원: {data.get('headcount')} | 일정: {data.get('duration')} | 스타일: {data.get('styles')}
 
         [필수 추천]
         {options_text}
@@ -365,28 +356,22 @@ def generate():
 
         if data.get('is_bike_mode'):
             prompt += """
-        [바이크 라이딩 경로 특별 지침 - 매우 중요]
-        1. 고속도로 및 자동차 전용도로 절대 진입 금지.
-        2. 라이더가 네비게이션(카카오맵/티맵)에 직접 찍고 달릴 수 있도록 **구체적인 경유지 명칭(고개/재/령, 교차로/삼거리, 지방도 번호)**을 번호순으로 명확히 제시할 것.
-        3. 출발지 바로 앞이 아닌, 목적지 방향으로 최소 1시간 이상 주행한 지점부터 첫 번째 경유지를 지정할 것.
+        [바이크 전용 경로 규칙]
+        - 고속도로 및 자동차 전용도로 절대 금지.
+        - 네비게이션(카카오맵/티맵)에 입력할 구체적 경유지(고개/재/령, 삼거리, 지방도 번호)를 번호순으로 명확히 제시.
         """
             if data.get('avoid_large_roads'):
-                prompt += """
-        4. [4차선 대로 배제 및 숨은 라이딩 코스]:
-           - 지루하고 직선으로 뚫린 신설 4차선 국도/터널을 완전히 배제할 것.
-           - 바이커들이 극찬하는 **숨겨진 옛길(구길), 2차선 강변/계곡 지방도, 고갯길 와인딩 코스** 위주로 경유지를 연결할 것.
-           - 각 경유지마다 [네비 입력 지점 명칭]과 해당 도로의 라이딩 매력 포인트를 1줄씩 함께 설명할 것.
-        """
+                prompt += "- 4차선 직선 국도 배제. 바이커 선호 2차선 와인딩 구길/지방도 위주 경유지 연결.\n"
         else:
             prompt += f"""
         [일반 모드 규칙]
-        - 이동 경로의 불필요한 나열보다 목적지({data.get('destination')}) 현지에서 즐길 수 있는 관광 명소, 테마별 체험, 핫플레이스 위주로 풍성하게 구성할 것.
+        - 목적지({data.get('destination')}) 현지의 명소, 체험, 맛집 위주로 알차게 구성.
         """
 
         if data.get('region_type') == "국내":
             prompt += """
         [지도 링크]
-        주요 장소명 및 경유지명 뒤에 필수 표기: [네이버지도](https://map.naver.com/v5/search/{장소명}) | [카카오맵](https://map.kakao.com/link/search/{장소명})
+        주요 장소명 뒤: [네이버지도](https://map.naver.com/v5/search/{장소명}) | [카카오맵](https://map.kakao.com/link/search/{장소명})
             """
         else:
             prompt += """
@@ -396,13 +381,13 @@ def generate():
 
         prompt += f"""
         [출력 양식]
-        # {data.get('destination')} 맞춤 여행 코스 및 일정 ({data.get('headcount')}, {data.get('duration')})
-        ## 1. 최적 라이딩/여행 코스 및 세부 일정 (네비 입력용 필수 경유지 포함)
+        # {data.get('destination')} 맞춤 여행 코스 ({data.get('headcount')}, {data.get('duration')})
+        ## 1. 최적 라이딩/여행 코스 (네비 입력용 경유지 포함)
         ## 2. 현지 로컬 맛집 & 노포
-        ## 3. 가성비 숙소 추천
-        ## 4. 추천 액티비티 & 이색 체험
+        ## 3. 추천 숙소
+        ## 4. 액티비티 & 이색 체험
         ## 5. 선상 낚시 (해당 시)
-        ## 6. 라이딩/여행 꿀팁 & 주의사항
+        ## 6. 라이딩/여행 꿀팁
         """
 
         response = model.generate_content(prompt)
@@ -425,37 +410,18 @@ def download_pdf():
         styles = request.form.get('styles', '자유 여행')
 
         genai.configure(api_key=API_KEY)
-        model = genai.GenerativeModel("gemini-3.6-flash")
+        model = genai.GenerativeModel("gemini-2.5-flash")
 
         pdf_prompt = f"""
-        여행 정산 및 정보 요약 전문가로서, 아래 조건에 맞춰 PDF 인쇄용 [여행 견적 및 핵심 추천 요약서]를 작성해주세요.
-        *주의: 이동 코스는 제외하고, 경비 정산표와 핵심 장소(숙소/맛집/체험) 정보만 명확히 작성하세요.*
+        PDF 인쇄용 [여행 견적 및 핵심 요약서]를 간결히 작성하세요. 이동 코스는 제외하고 정산표와 핵심 장소만 적으세요.
+        - 목적지: {destination} | 인원: {headcount} | 일정: {duration} | 스타일: {styles}
 
-        [조건]
-        - 목적지: {destination}
-        - 인원: {headcount}
-        - 일정: {duration}
-        - 스타일: {styles}
-
-        [작성 형식]
-        # {destination} 여행 핵심 정보 및 경비 요약서 ({headcount}, {duration})
-
+        # {destination} 여행 핵심 견적서 ({headcount}, {duration})
         ## 1. 예상 경비 견적표
-        - 식비 (1인당 예상): OOO원
-        - 숙박비 (1인당 예상): OOO원 (당일치기인 경우 0원)
-        - 액티비티/선상낚시/체험 (1인당 예상): OOO원
-        - 유류비/교통비 (1인당 예상): OOO원
+        - 식비/숙박비/체험비/교통비 항목별 산출
         - [1인당 총 예상 경비]: OOO원
         - [{headcount} 전체 총 예상 경비]: OOO원
-
-        ## 2. 엄선 로컬 맛집
-        - [식당명]: 대표메뉴 및 특징, 1인당 예상 가격
-
-        ## 3. 추천 가성비 숙소 (당일치기면 생략 또는 주변 쉼터)
-        - [숙소명]: 객실 특징, 가성비 포인트, 예상 1박 요금
-
-        ## 4. 추천 액티비티 & 선상 낚시
-        - [프로그램/선단명]: 특징, 소요시간, 1인 체험비
+        ## 2. 엄선 맛집 / 숙소 / 액티비티 요약
         """
 
         res = model.generate_content(pdf_prompt)
@@ -520,9 +486,6 @@ def download_pdf():
             elif line_str.startswith('## '):
                 clean_h2 = re.sub(r'^##\s*', '', safe_text)
                 story.append(Paragraph(clean_h2, h2_style))
-            elif line_str.startswith('### '):
-                clean_h3 = re.sub(r'^###\s*', '', safe_text)
-                story.append(Paragraph(clean_h3, h2_style))
             else:
                 story.append(Paragraph(safe_text, body_style))
 
@@ -539,4 +502,5 @@ def download_pdf():
         return f"PDF 생성 중 오류 발생: {str(e)}", 500
 
 if __name__ == '__main__':
-    app.run(host='0.0.0.0', port=5000)
+    port = int(os.environ.get('PORT', 5000))
+    app.run(host='0.0.0.0', port=port)
