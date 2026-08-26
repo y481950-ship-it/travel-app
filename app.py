@@ -95,7 +95,7 @@ HTML_TEMPLATE = """
             <input type="text" id="start_location" placeholder="출발지 입력" style="display: none;">
             
             <div class="section-title">3. 목적지</div>
-            <input type="text" id="destination" placeholder="예: 영월, 속초, 삼척, 낙산사" required>
+            <input type="text" id="destination" placeholder="예: 영월, 속초, 삼척, 노지 주소 등" required>
 
             <div class="section-title">4. 인원수</div>
             <div class="radio-group">
@@ -352,7 +352,7 @@ def generate():
         options_text = "\n".join(options)
 
         prompt = f"""
-        당신은 베테랑 여행 플래너입니다. 상세하고 정확한 여행 코스와 장소 정보를 작성해주세요.
+        당신은 국내 최고 권위의 바이크 투어링 및 여행 코스 기획 전문가입니다.
 
         [조건]
         - 지역: {data.get('region_type')} | 출발지: {data.get('start_location')} | 목적지: {data.get('destination')}
@@ -365,22 +365,28 @@ def generate():
 
         if data.get('is_bike_mode'):
             prompt += """
-        [바이크 전용 규칙]
-        - 고속도로 및 자동차 전용도로 절대 진입 금지.
-        - 출발지 인근 경유지는 제외하고 목적지 방향으로 최소 1시간 주행 후 첫 경유지가 나오게 구성.
+        [바이크 라이딩 경로 특별 지침 - 매우 중요]
+        1. 고속도로 및 자동차 전용도로 절대 진입 금지.
+        2. 라이더가 네비게이션(카카오맵/티맵)에 직접 찍고 달릴 수 있도록 **구체적인 경유지 명칭(고개/재/령, 교차로/삼거리, 지방도 번호)**을 번호순으로 명확히 제시할 것.
+        3. 출발지 바로 앞이 아닌, 목적지 방향으로 최소 1시간 이상 주행한 지점부터 첫 번째 경유지를 지정할 것.
         """
             if data.get('avoid_large_roads'):
-                prompt += "- 4차선 대로 배제, 2차선 지방도/국도 위주.\n"
+                prompt += """
+        4. [4차선 대로 배제 및 숨은 라이딩 코스]:
+           - 지루하고 직선으로 뚫린 신설 4차선 국도/터널을 완전히 배제할 것.
+           - 바이커들이 극찬하는 **숨겨진 옛길(구길), 2차선 강변/계곡 지방도, 고갯길 와인딩 코스** 위주로 경유지를 연결할 것.
+           - 각 경유지마다 [네비 입력 지점 명칭]과 해당 도로의 라이딩 매력 포인트를 1줄씩 함께 설명할 것.
+        """
         else:
             prompt += f"""
         [일반 모드 규칙]
-        - 이동 경로 나열보다 목적지({data.get('destination')}) 현지에서 즐길 수 있는 명소, 체험, 핫플레이스 위주로 풍성하게 구성.
+        - 이동 경로의 불필요한 나열보다 목적지({data.get('destination')}) 현지에서 즐길 수 있는 관광 명소, 테마별 체험, 핫플레이스 위주로 풍성하게 구성할 것.
         """
 
         if data.get('region_type') == "국내":
             prompt += """
         [지도 링크]
-        주요 장소명 뒤에 필수 표기: [네이버지도](https://map.naver.com/v5/search/{장소명}) | [카카오맵](https://map.kakao.com/link/search/{장소명})
+        주요 장소명 및 경유지명 뒤에 필수 표기: [네이버지도](https://map.naver.com/v5/search/{장소명}) | [카카오맵](https://map.kakao.com/link/search/{장소명})
             """
         else:
             prompt += """
@@ -391,12 +397,12 @@ def generate():
         prompt += f"""
         [출력 양식]
         # {data.get('destination')} 맞춤 여행 코스 및 일정 ({data.get('headcount')}, {data.get('duration')})
-        ## 1. 여행 코스 및 세부 일정
+        ## 1. 최적 라이딩/여행 코스 및 세부 일정 (네비 입력용 필수 경유지 포함)
         ## 2. 현지 로컬 맛집 & 노포
         ## 3. 가성비 숙소 추천
         ## 4. 추천 액티비티 & 이색 체험
         ## 5. 선상 낚시 (해당 시)
-        ## 6. 여행 꿀팁
+        ## 6. 라이딩/여행 꿀팁 & 주의사항
         """
 
         response = model.generate_content(prompt)
