@@ -158,7 +158,7 @@ HTML_TEMPLATE = """
         }
 
         let currentPayload = {};
-        let detectedAddress = "";
+        let detectedAddress = "현재 위치";
 
         function requestCurrentLocation() {
             if ("geolocation" in navigator) {
@@ -177,15 +177,21 @@ HTML_TEMPLATE = """
                         const province = addr.province || addr.city || addr.state || "";
                         const city = addr.city || addr.county || addr.district || "";
                         const town = addr.town || addr.village || addr.suburb || "";
-                        detectedAddress = `${province} ${city} ${town}`.trim();
-                        infoEl.innerText = detectedAddress ? `📍 감지된 위치: ${detectedAddress}` : "📍 현재 위치 확인 완료";
+                        const full = `${province} ${city} ${town}`.trim();
+                        if (full) {
+                            detectedAddress = full;
+                            infoEl.innerText = `📍 감지된 위치: ${detectedAddress}`;
+                        } else {
+                            detectedAddress = "현재 위치";
+                            infoEl.innerText = "📍 현재 위치 확인 완료";
+                        }
                     } catch(e) {
                         detectedAddress = "현재 위치";
                         infoEl.innerText = "📍 현재 위치 확인 완료";
                     }
                 }, () => {
                     detectedAddress = "현재 위치";
-                    document.getElementById('gps-info').innerText = "📍 현재 위치 (권한 미허용)";
+                    document.getElementById('gps-info').innerText = "📍 현재 위치";
                 }, { timeout: 4000 });
             }
         }
@@ -210,9 +216,6 @@ HTML_TEMPLATE = """
             input.style.display = isCustom ? 'block' : 'none';
             infoEl.style.display = isCustom ? 'none' : 'block';
             input.placeholder = '출발지 입력 (예: 서울 강남, 수원)';
-            if (!isCustom && !detectedAddress) {
-                requestCurrentLocation();
-            }
         }
 
         function toggleHeadcountInput() {
@@ -253,7 +256,7 @@ HTML_TEMPLATE = """
 
             currentPayload = {
                 region_type: regionType,
-                start_location: startLocation,
+                start_location: startLocation || "현재 위치",
                 destination: destination,
                 headcount: headcountVal,
                 duration: document.querySelector('input[name="duration"]:checked').value,
@@ -276,15 +279,7 @@ HTML_TEMPLATE = """
                     body: JSON.stringify(currentPayload)
                 });
                 
-                const text = await res.text();
-                let data;
-                try {
-                    data = JSON.parse(text);
-                } catch(e) {
-                    alert('서버 응답 파싱 실패: 잠시 후 다시 시도해주세요.');
-                    resetForm();
-                    return;
-                }
+                const data = await res.json();
                 
                 if (!res.ok || data.error) {
                     alert(data.error || '생성 중 오류가 발생했습니다.');
@@ -297,7 +292,7 @@ HTML_TEMPLATE = """
                 document.getElementById('result-area').style.display = 'block';
                 window.scrollTo({ top: 0, behavior: 'smooth' });
             } catch (err) {
-                alert('연결 오류가 발생했습니다. 다시 시도해주세요.');
+                alert('요청 처리 중 오류가 발생했습니다. 잠시 후 다시 시도해주세요.');
                 resetForm();
             }
         }
@@ -375,9 +370,16 @@ def index():
 @app.route('/generate', methods=['POST'])
 def generate():
     try:
-        data = request.get_json(force=True)
+        data = request.get_json(force=True) or {}
         genai.configure(api_key=API_KEY)
         model = genai.GenerativeModel("gemini-3.6-flash")
+
+        region_type = data.get('region_type', '국내')
+        start_location = data.get('start_location') or '현재 위치'
+        destination = data.get('destination', '목적지')
+        headcount = data.get('headcount', '1명')
+        duration = data.get('duration', '당일치기')
+        styles = data.get('styles', '자유 여행')
 
         options = []
         output_sections = ["## 1. 최적 라이딩/여행 코스 (카카오맵 네비 입력용 촘촘한 경유지 포함)"]
@@ -410,8 +412,8 @@ def generate():
         *주의: 체크 해제된 항목은 절대 작성하지 마세요.*
 
         [조건]
-        - 지역: {data.get('region_type')} | 출발지: {data.get('start_location')} | 목적지: {data.get('destination')}
-        - 인원: {data.get('headcount')} | 일정: {data.get('duration')} | 스타일: {data.get('styles')}
+        - 지역: {region_type} | 출발지: {start_location} | 목적지: {destination}
+        - 인원: {headcount} | 일정: {duration} | 스타일: {styles}
 
         [포함 요청 항목]
         {options_text}
@@ -431,10 +433,10 @@ def generate():
         else:
             prompt += f"""
         [일반 모드 규칙]
-        - 목적지({data.get('destination')}) 현지의 명소 및 코스 위주로 구성.
+        - 목적지({destination}) 현지의 명소 및 코스 위주로 구성.
         """
 
-        if data.get('region_type') == "국내":
+        if region_type == "국내":
             prompt += """
         [지도 링크]
         주요 장소명 뒤: [카카오맵](https://map.kakao.com/link/search/{장소명}) | [네이버지도](https://map.naver.com/v5/search/{장소명})
@@ -447,7 +449,7 @@ def generate():
 
         prompt += f"""
         [출력 양식]
-        # {data.get('destination')} 맞춤 여행 코스 ({data.get('headcount')}, {data.get('duration')})
+        # {destination} 맞춤 여행 코스 ({headcount}, {duration})
         {output_format_text}
         """
 
@@ -460,7 +462,7 @@ def generate():
         err_msg = str(e)
         if "429" in err_msg or "Quota exceeded" in err_msg or "RESOURCE_EXHAUSTED" in err_msg:
             return jsonify({'error': '⚠️ 오늘 무료 AI 사용량(20회)이 모두 소진되었습니다.\n한국 시간 기준 내일 오후 4시에 자동 초기화됩니다.'}), 429
-        return jsonify({'error': f'API 오류: {err_msg}'}), 500
+        return jsonify({'error': f'서버 처리 오류: {err_msg}'}), 500
 
 @app.route('/download_pdf', methods=['POST'])
 def download_pdf():
