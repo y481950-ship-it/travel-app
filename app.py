@@ -71,6 +71,7 @@ HTML_TEMPLATE = """
         .plan-content h2 { font-size: 1.1rem; color: #0b7285; margin: 14px 0 6px; }
         .plan-content h3 { font-size: 1rem; color: #2b8a3e; margin: 10px 0 4px; }
         .plan-content a { color: #1a73e8; font-weight: bold; text-decoration: underline; }
+        .gps-status { font-size: 0.82rem; color: #1a73e8; margin-top: -6px; margin-bottom: 8px; display: block; }
     </style>
 </head>
 <body>
@@ -80,16 +81,17 @@ HTML_TEMPLATE = """
         <form id="plan-form">
             <div class="section-title">1. 지역 구분</div>
             <div class="radio-group">
-                <label><input type="radio" name="region_type" value="국내" checked onchange="toggleRegion()"> 🇰🇷 국내</label>
+                <label><input type="radio" name="region_type" value="국내" checked onchange="toggleRegion()"> 국내</label>
                 <label><input type="radio" name="region_type" value="해외" onchange="toggleRegion()"> ✈️ 해외</label>
             </div>
 
             <div id="domestic-start">
                 <div class="section-title">2. 출발지 설정</div>
                 <div class="radio-group">
-                    <label><input type="radio" name="start_mode" value="default" checked onchange="toggleStartInput()"> 📍 현재 위치 (경기 여주)</label>
+                    <label><input type="radio" name="start_mode" value="default" checked onchange="toggleStartInput()"> 📍 현재 위치</label>
                     <label><input type="radio" name="start_mode" value="custom" onchange="toggleStartInput()"> ✏️ 직접 입력</label>
                 </div>
+                <span id="gps-info" class="gps-status"></span>
             </div>
 
             <input type="text" id="start_location" placeholder="출발지 입력" style="display: none;">
@@ -156,6 +158,39 @@ HTML_TEMPLATE = """
         }
 
         let currentPayload = {};
+        let detectedAddress = "";
+
+        function requestCurrentLocation() {
+            if ("geolocation" in navigator) {
+                const infoEl = document.getElementById('gps-info');
+                infoEl.innerText = "🛰️ 현재 위치 확인 중...";
+                navigator.geolocation.getCurrentPosition(async (pos) => {
+                    const lat = pos.coords.latitude;
+                    const lon = pos.coords.longitude;
+                    try {
+                        const controller = new AbortController();
+                        const timeoutId = setTimeout(() => controller.abort(), 4000);
+                        const res = await fetch(`https://nominatim.openstreetmap.org/reverse?format=json&lat=${lat}&lon=${lon}&accept-language=ko`, { signal: controller.signal });
+                        clearTimeout(timeoutId);
+                        const data = await res.json();
+                        const addr = data.address || {};
+                        const province = addr.province || addr.city || addr.state || "";
+                        const city = addr.city || addr.county || addr.district || "";
+                        const town = addr.town || addr.village || addr.suburb || "";
+                        detectedAddress = `${province} ${city} ${town}`.trim();
+                        infoEl.innerText = detectedAddress ? `📍 현재 위치: ${detectedAddress}` : "📍 현재 위치 확인 완료";
+                    } catch(e) {
+                        detectedAddress = "현재 위치";
+                        infoEl.innerText = "📍 현재 위치 확인 완료";
+                    }
+                }, () => {
+                    detectedAddress = "현재 위치";
+                    document.getElementById('gps-info').innerText = "📍 현재 위치";
+                }, { timeout: 5000 });
+            }
+        }
+
+        requestCurrentLocation();
 
         function toggleRegion() {
             const isDomestic = document.querySelector('input[name="region_type"]:checked').value === '국내';
@@ -171,8 +206,13 @@ HTML_TEMPLATE = """
         function toggleStartInput() {
             const isCustom = document.querySelector('input[name="start_mode"]:checked').value === 'custom';
             const input = document.getElementById('start_location');
+            const infoEl = document.getElementById('gps-info');
             input.style.display = isCustom ? 'block' : 'none';
+            infoEl.style.display = isCustom ? 'none' : 'block';
             input.placeholder = '출발지 입력 (예: 서울 강남, 수원)';
+            if (!isCustom && !detectedAddress) {
+                requestCurrentLocation();
+            }
         }
 
         function toggleHeadcountInput() {
@@ -191,7 +231,7 @@ HTML_TEMPLATE = """
             if (!destination) { alert('목적지를 입력해주세요.'); return; }
 
             const regionType = document.querySelector('input[name="region_type"]:checked').value;
-            let startLocation = "경기 여주(현재 위치)";
+            let startLocation = detectedAddress || "현재 위치";
             if (regionType === '해외' || document.querySelector('input[name="start_mode"]:checked').value === 'custom') {
                 startLocation = document.getElementById('start_location').value.trim();
                 if (!startLocation) { alert('출발지를 입력해주세요.'); return; }
@@ -249,7 +289,7 @@ HTML_TEMPLATE = """
                 document.getElementById('result-area').style.display = 'block';
                 window.scrollTo({ top: 0, behavior: 'smooth' });
             } catch (err) {
-                alert('서버 응답 오류: 잠시 후 다시 시도해주세요.');
+                alert('서버 처리 중 오류가 발생했습니다. 잠시 후 다시 시도해주세요.');
                 resetForm();
             }
         }
