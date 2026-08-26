@@ -289,7 +289,7 @@ HTML_TEMPLATE = """
                 document.getElementById('result-area').style.display = 'block';
                 window.scrollTo({ top: 0, behavior: 'smooth' });
             } catch (err) {
-                alert('서버 처리 중 오류가 발생했습니다. 잠시 후 다시 시도해주세요.');
+                alert('연결 에러: ' + err.message);
                 resetForm();
             }
         }
@@ -446,7 +446,7 @@ def generate():
         err_msg = str(e)
         if "429" in err_msg or "Quota exceeded" in err_msg or "RESOURCE_EXHAUSTED" in err_msg:
             return jsonify({'error': '⚠️ 오늘 무료 AI 사용량(20회)이 모두 소진되었습니다.\n한국 시간 기준 내일 오후 4시에 자동 초기화됩니다.'}), 429
-        return jsonify({'error': f'오류 발생: {err_msg}'}), 500
+        return jsonify({'error': f'구글 API 오류: {err_msg}'}), 500
 
 @app.route('/download_pdf', methods=['POST'])
 def download_pdf():
