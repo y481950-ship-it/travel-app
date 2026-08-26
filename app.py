@@ -372,7 +372,7 @@ def generate():
     try:
         data = request.get_json(force=True) or {}
         genai.configure(api_key=API_KEY)
-        model = genai.GenerativeModel("gemini-1.5-flash")
+        model = genai.GenerativeModel("gemini-3.6-flash")
 
         region_type = data.get('region_type', '국내')
         start_location = data.get('start_location') or '현재 위치'
@@ -473,7 +473,7 @@ def download_pdf():
         styles = request.form.get('styles', '자유 여행')
 
         genai.configure(api_key=API_KEY)
-        model = genai.GenerativeModel("gemini-1.5-flash")
+        model = genai.GenerativeModel("gemini-3.6-flash")
 
         pdf_prompt = f"""
         PDF 인쇄용 [여행 견적 및 핵심 요약서]를 간결히 작성하세요. 이동 코스는 제외하고 정산표와 핵심 장소만 적으세요.
