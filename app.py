@@ -197,6 +197,38 @@ HTML_TEMPLATE = """
         let currentPayload = {};
         let detectedAddress = "현재 위치";
 
+        // 뒤로가기 가로채기 및 종료 제어 로직
+        history.pushState(null, null, location.href);
+        window.onpopstate = function () {
+            const modal = document.getElementById('estimate-modal');
+            const resultArea = document.getElementById('result-area');
+
+            // 1. 견적 모달이 열려있으면 모달만 닫기
+            if (modal && modal.style.display === 'block') {
+                closeEstimateModal();
+                history.pushState(null, null, location.href);
+                return;
+            }
+
+            // 2. 결과 화면이면 입력창(첫 화면)으로 복귀
+            if (resultArea && resultArea.style.display === 'block') {
+                resetForm();
+                history.pushState(null, null, location.href);
+                return;
+            }
+
+            // 3. 첫 화면일 때 완전히 앱 종료 여부 확인
+            if (confirm("앱을 완전히 종료하시겠습니까?")) {
+                window.close();
+                // 브라우저에 의해 window.close()가 차단될 경우 빈 페이지/이탈 처리
+                setTimeout(() => {
+                    location.href = "about:blank";
+                }, 100);
+            } else {
+                history.pushState(null, null, location.href);
+            }
+        };
+
         function requestCurrentLocation() {
             if ("geolocation" in navigator) {
                 const infoEl = document.getElementById('gps-info');
