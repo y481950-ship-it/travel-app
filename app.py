@@ -70,7 +70,6 @@ HTML_TEMPLATE = """
         .plan-content h1 { font-size: 1.25rem; color: #1e3d59; text-align: left; margin: 16px 0 8px; border-bottom: 2px solid #1e3d59; padding-bottom: 4px; }
         .plan-content h2 { font-size: 1.1rem; color: #0b7285; margin: 14px 0 6px; }
         .plan-content h3 { font-size: 1rem; color: #2b8a3e; margin: 10px 0 4px; }
-        .plan-content a { color: #1a73e8; font-weight: bold; text-decoration: underline; }
         .gps-status { font-size: 0.82rem; color: #1a73e8; margin-top: -6px; margin-bottom: 8px; display: block; }
     </style>
 </head>
@@ -334,7 +333,6 @@ HTML_TEMPLATE = """
 """
 
 def markdown_to_html(text):
-    text = re.sub(r'\[([^\]]+)\]\((https?://[^\)]+)\)', r'<a href="\2" target="_blank">\1</a>', text)
     text = re.sub(r'^### (.*$)', r'<h3>\1</h3>', text, flags=re.MULTILINE)
     text = re.sub(r'^## (.*$)', r'<h2>\1</h2>', text, flags=re.MULTILINE)
     text = re.sub(r'^# (.*$)', r'<h1>\1</h1>', text, flags=re.MULTILINE)
@@ -390,23 +388,23 @@ def generate():
         styles = data.get('styles', '자유 여행')
 
         options = []
-        output_sections = ["## 1. 최적 코스 및 카카오맵 경유지"]
+        output_sections = ["## 1. 최적 코스 및 네비 입력용 경유지 목록"]
         sec_num = 2
 
         if data.get('include_food'):
-            options.append("- 맛집/노포: 2곳 추천 및 카카오맵 링크")
+            options.append("- 로컬 맛집/노포: 2곳 (상호명 및 도로명/지번 주소 명시)")
             output_sections.append(f"## {sec_num}. 현지 로컬 맛집")
             sec_num += 1
         if data.get('include_stay'):
-            options.append("- 숙소: 1곳 추천 및 카카오맵 링크")
+            options.append("- 추천 숙소: 1곳 (숙소명 및 도로명/지번 주소 명시)")
             output_sections.append(f"## {sec_num}. 가성비 숙소")
             sec_num += 1
         if data.get('include_activity'):
-            options.append("- 액티비티: 1곳 추천 및 카카오맵 링크")
+            options.append("- 액티비티/체험: 1곳 (장소명 및 도로명/지번 주소 명시)")
             output_sections.append(f"## {sec_num}. 체험 액티비티")
             sec_num += 1
         if data.get('include_fishing'):
-            options.append("- 선상 낚시: 1곳 추천 및 카카오맵 링크")
+            options.append("- 선상 낚시: 1곳 (선단/항구명 및 주소 명시)")
             output_sections.append(f"## {sec_num}. 선상 낚시")
             sec_num += 1
 
@@ -416,44 +414,34 @@ def generate():
         output_format_text = "\n".join(output_sections)
 
         prompt = f"""
-        당신은 바이크 투어 전문가입니다. 불필요한 서론/결론/미사여구 없이 즉시 출력 양식에 맞추어 핵심 리스트만 간결하고 명확하게 작성하세요.
-        *주의: 체크 해제된 항목은 절대 작성하지 마세요.*
+        당신은 대한민국 최고의 여행/바이크 투어 전문가입니다. 
+        인터넷 URL 링크는 일절 작성하지 마시고, 네비게이션 검색창에 바로 입력할 수 있는 [정확한 명칭 + 도로명 또는 지번 주소] 위주로 간결하고 명확하게 작성하세요.
+        *주의: 체크 해제된 항목은 본문에 아예 적지 마세요.*
 
         [조건]
-        - 지역: {region_type} | 출발: {start_location} | 도착: {destination}
+        - 구분: {region_type} | 출발: {start_location} | 도착: {destination}
         - 인원: {headcount} | 일정: {duration} | 테마: {styles}
 
-        [포함 항목]
+        [포함 요청 항목]
         {options_text}
         """
 
         if data.get('is_bike_mode'):
             prompt += """
-        [바이크 경로 필수 규칙]
-        1. 자동차 전용도로/고속도로 완전 배제.
-        2. 첫 경유지는 출발 50분 후 지점부터.
-        3. 카카오맵 검색 가능한 교차로/삼거리/고개 정상 명칭 명시.
+        [바이크 경로 규칙]
+        1. 고속도로 및 자동차 전용도로 완전 배제.
+        2. 첫 경유지는 출발지에서 최소 50분 주행한 지점부터 지정.
+        3. 네비게이션 검색용 경유지 작성 시: 교차로명, 삼거리명, 고개 정상 휴게소 등 구체적 지명과 주소를 반드시 표기.
         """
             if data.get('avoid_large_roads'):
                 prompt += """
-        4. 4차선 국도 배제: 2차선 와인딩/지방도/옛길 위주 경유지 설정.
+        4. 4차선 국도 배제: 2차선 와인딩/지방도/옛길 위주 경유지 촘촘히 설정.
         """
         else:
             prompt += f"""
-        [일반 모드]
-        - 목적지({destination}) 중심 명소 및 효율 코스 간결 작성.
+        [일반 모드 규칙]
+        - {destination} 목적지 중심 명소 및 효율 코스 위주 작성.
         """
-
-        if region_type == "국내":
-            prompt += """
-        [지도 링크 포맷]
-        장소명 뒤: [카카오맵](https://map.kakao.com/link/search/{장소명}) | [네이버지도](https://map.naver.com/v5/search/{장소명})
-            """
-        else:
-            prompt += """
-        [지도 링크 포맷]
-        [구글지도](https://www.google.com/maps/search/?api=1&query={장소명})
-            """
 
         prompt += f"""
         [출력 양식]
@@ -463,7 +451,7 @@ def generate():
 
         response = model.generate_content(
             prompt,
-            generation_config={"temperature": 0.5}
+            generation_config={"temperature": 0.4}
         )
         raw_text = response.text
         html_text = markdown_to_html(raw_text)
@@ -487,7 +475,7 @@ def download_pdf():
         model = genai.GenerativeModel("gemini-3.6-flash")
 
         pdf_prompt = f"""
-        PDF 인쇄용 [여행 견적 요약서]를 간결히 작성하세요.
+        PDF 인쇄용 [여행 견적 요약서]를 간결히 작성하세요. URL 링크는 일절 넣지 마세요.
         - 목적지: {destination} | 인원: {headcount} | 일정: {duration} | 스타일: {styles}
 
         # {destination} 여행 핵심 견적서 ({headcount}, {duration})
@@ -495,12 +483,12 @@ def download_pdf():
         - 식비/숙박비/체험비/교통비 항목별 산출
         - [1인당 총 예상 경비]: OOO원
         - [{headcount} 전체 총 예상 경비]: OOO원
-        ## 2. 핵심 요약
+        ## 2. 핵심 장소 요약 (명칭 및 주소)
         """
 
         res = model.generate_content(
             pdf_prompt,
-            generation_config={"temperature": 0.5}
+            generation_config={"temperature": 0.4}
         )
         pdf_text = res.text
 
