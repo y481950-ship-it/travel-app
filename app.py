@@ -182,7 +182,7 @@ HTML_TEMPLATE = """
             <div class="total-box">
                 <div class="total-title">전체 총 예상 경비</div>
                 <div class="total-val" id="grand-total">70,000 원</div>
-                <div class="per-person" id="per-person-total">1인당 부담금: 70,000 원</div>
+                <div class="per-person" id="per-person-total">1인당 정산금: 70,000 원</div>
             </div>
 
             <button type="button" class="btn-copy" onclick="copyEstimate()">📋 카톡 정산용 복사하기</button>
@@ -200,21 +200,43 @@ HTML_TEMPLATE = """
         function requestCurrentLocation() {
             if ("geolocation" in navigator) {
                 const infoEl = document.getElementById('gps-info');
-                infoEl.innerText = "🛰️ 현재 위치 파악 중...";
+                infoEl.innerText = "🛰️ 고정밀 GPS 위치 측정 중...";
+                
+                // 실제 위성 GPS 하드웨어 강제 호출
+                const geoOptions = {
+                    enableHighAccuracy: true,
+                    timeout: 8000,
+                    maximumAge: 0
+                };
+
                 navigator.geolocation.getCurrentPosition(async (pos) => {
                     const lat = pos.coords.latitude;
                     const lon = pos.coords.longitude;
                     try {
                         const controller = new AbortController();
-                        const tId = setTimeout(() => controller.abort(), 2500);
-                        const res = await fetch(`https://nominatim.openstreetmap.org/reverse?format=json&lat=${lat}&lon=${lon}&accept-language=ko`, { signal: controller.signal });
+                        const tId = setTimeout(() => controller.abort(), 4000);
+                        // zoom=18로 상세 건물/동 레벨까지 요청
+                        const res = await fetch(`https://nominatim.openstreetmap.org/reverse?format=json&lat=${lat}&lon=${lon}&zoom=18&addressdetails=1&accept-language=ko`, { signal: controller.signal });
                         clearTimeout(tId);
                         const data = await res.json();
                         const addr = data.address || {};
+                        
                         const province = addr.province || addr.city || addr.state || "";
                         const city = addr.city || addr.county || addr.district || "";
-                        const town = addr.town || addr.village || addr.suburb || "";
-                        const full = `${province} ${city} ${town}`.trim();
+                        // 세부 행정동/법정동/리 순차적 정밀 탐색
+                        const town = addr.neighbourhood || addr.suburb || addr.quarter || addr.town || addr.village || addr.hamlet || "";
+                        
+                        let full = "";
+                        if (province && city && town) {
+                            full = `${province} ${city} ${town}`.trim();
+                        } else if (city && town) {
+                            full = `${city} ${town}`.trim();
+                        } else if (town) {
+                            full = town;
+                        } else {
+                            full = data.display_name ? data.display_name.split(',')[0].trim() : "";
+                        }
+
                         if (full) {
                             detectedAddress = full;
                             infoEl.innerText = `📍 감지된 위치: ${detectedAddress}`;
@@ -228,8 +250,8 @@ HTML_TEMPLATE = """
                     }
                 }, () => {
                     detectedAddress = "현재 위치";
-                    document.getElementById('gps-info').innerText = "📍 현재 위치";
-                }, { timeout: 3000 });
+                    document.getElementById('gps-info').innerText = "📍 현재 위치 (직접 입력 가능)";
+                }, geoOptions);
             }
         }
 
@@ -252,7 +274,7 @@ HTML_TEMPLATE = """
             const infoEl = document.getElementById('gps-info');
             input.style.display = isCustom ? 'block' : 'none';
             infoEl.style.display = isCustom ? 'none' : 'block';
-            input.placeholder = '출발지 입력 (예: 서울 강남, 수원)';
+            input.placeholder = '출발지 입력 (예: 서울 강남, 여주 월송동)';
         }
 
         function toggleHeadcountInput() {
