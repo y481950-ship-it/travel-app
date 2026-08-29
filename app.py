@@ -1,34 +1,10 @@
-from flask import Flask, request, jsonify, send_file, render_template_string, Response, send_from_directory
+from flask import Flask, request, jsonify, render_template_string, Response, send_from_directory
 import google.generativeai as genai
 import os
-import io
 import re
 import json
-import xml.sax.saxutils as saxutils
-from reportlab.lib.pagesizes import A4
-from reportlab.platypus import SimpleDocTemplate, Paragraph, Spacer
-from reportlab.lib.styles import getSampleStyleSheet, ParagraphStyle
-from reportlab.lib import colors
-import urllib.request
-from reportlab.pdfbase import pdfmetrics
-from reportlab.pdfbase.ttfonts import TTFont
 
 app = Flask(__name__)
-
-# 한글 폰트 설정
-FONT_PATH = "NanumGothic.ttf"
-if not os.path.exists(FONT_PATH):
-    try:
-        url = "https://github.com/google/fonts/raw/main/ofl/nanumgothic/NanumGothic-Regular.ttf"
-        urllib.request.urlretrieve(url, FONT_PATH)
-    except Exception:
-        pass
-
-if os.path.exists(FONT_PATH):
-    pdfmetrics.registerFont(TTFont("NanumGothic", FONT_PATH))
-    MAIN_FONT = "NanumGothic"
-else:
-    MAIN_FONT = "Helvetica"
 
 API_KEY = "AQ.Ab8RN6KNyTYb9CRCpApOtdKKdV5AhjT07NZ5PVbe7ZSIzCXOPw"
 
@@ -65,12 +41,31 @@ HTML_TEMPLATE = """
         .btn-group { display: flex; gap: 8px; margin-bottom: 14px; }
         .btn-group button { margin-top: 0; }
         .btn-reset { background: #6c757d; }
-        .btn-pdf { background: #28a745; }
+        .btn-estimate { background: #2b8a3e; }
         .plan-content { background: #fafafa; border: 1px solid #e2e8f0; padding: 14px; border-radius: 8px; font-size: 0.95rem; line-height: 1.6; }
         .plan-content h1 { font-size: 1.25rem; color: #1e3d59; text-align: left; margin: 16px 0 8px; border-bottom: 2px solid #1e3d59; padding-bottom: 4px; }
         .plan-content h2 { font-size: 1.1rem; color: #0b7285; margin: 14px 0 6px; }
         .plan-content h3 { font-size: 1rem; color: #2b8a3e; margin: 10px 0 4px; }
         .gps-status { font-size: 0.82rem; color: #1a73e8; margin-top: -6px; margin-bottom: 8px; display: block; }
+
+        /* 모바일 견적서/정산 모달 카드 UI */
+        .modal { display: none; position: fixed; z-index: 1000; left: 0; top: 0; width: 100%; height: 100%; background: rgba(0,0,0,0.5); backdrop-filter: blur(2px); }
+        .modal-content { background: #fff; margin: 8% auto; padding: 20px; border-radius: 16px; width: 92%; max-width: 480px; max-height: 85vh; overflow-y: auto; box-shadow: 0 4px 20px rgba(0,0,0,0.2); }
+        .modal-header { display: flex; justify-content: space-between; align-items: center; border-bottom: 2px solid #f1f3f5; padding-bottom: 10px; margin-bottom: 14px; }
+        .modal-header h2 { font-size: 1.15rem; color: #1e3d59; }
+        .close-btn { font-size: 1.5rem; font-weight: bold; color: #888; cursor: pointer; border: none; background: none; width: auto; padding: 0; }
+        
+        .calc-box { background: #f8fafc; border: 1px solid #e2e8f0; border-radius: 12px; padding: 14px; margin-bottom: 12px; }
+        .calc-row { display: flex; justify-content: space-between; align-items: center; margin-bottom: 10px; }
+        .calc-row label { font-size: 0.95rem; font-weight: bold; color: #475569; width: 40%; }
+        .calc-row input { width: 55%; padding: 8px; font-size: 0.95rem; text-align: right; border: 1px solid #cbd5e1; border-radius: 6px; margin-bottom: 0; font-weight: bold; }
+        
+        .total-box { background: #e0f2fe; border: 1px solid #bae6fd; border-radius: 12px; padding: 14px; text-align: center; margin-bottom: 14px; }
+        .total-box .total-title { font-size: 0.9rem; color: #0369a1; font-weight: bold; }
+        .total-box .total-val { font-size: 1.4rem; color: #0284c7; font-weight: 800; margin: 4px 0; }
+        .total-box .per-person { font-size: 0.95rem; color: #0f172a; font-weight: bold; }
+
+        .btn-copy { background: #3b82f6; font-size: 0.95rem; padding: 10px; margin-top: 0; }
     </style>
 </head>
 <body>
@@ -100,9 +95,9 @@ HTML_TEMPLATE = """
 
             <div class="section-title">4. 인원수</div>
             <div class="radio-group">
-                <label><input type="radio" name="headcount" value="1명(솔투)" checked onchange="toggleHeadcountInput()"> 👤 1인(솔투)</label>
-                <label><input type="radio" name="headcount" value="2명" onchange="toggleHeadcountInput()"> 👥 2인</label>
-                <label><input type="radio" name="headcount" value="3~4명" onchange="toggleHeadcountInput()"> 👨‍👩‍👧 3~4인</label>
+                <label><input type="radio" name="headcount" value="1" checked onchange="toggleHeadcountInput()"> 👤 1인(솔투)</label>
+                <label><input type="radio" name="headcount" value="2" onchange="toggleHeadcountInput()"> 👥 2인</label>
+                <label><input type="radio" name="headcount" value="4" onchange="toggleHeadcountInput()"> 👨‍👩‍👧 3~4인</label>
                 <label><input type="radio" name="headcount" value="custom" onchange="toggleHeadcountInput()"> 🚌 단체 (직접 입력)</label>
             </div>
             <input type="number" id="custom_headcount" placeholder="단체 인원수 입력 (숫자만, 예: 8)" style="display: none;" min="1">
@@ -145,9 +140,52 @@ HTML_TEMPLATE = """
         <div id="result-area">
             <div class="btn-group">
                 <button class="btn-reset" onclick="resetForm()">🔄 다시 설정하기</button>
-                <button class="btn-pdf" onclick="downloadPdf()">📄 핵심 견적서 PDF</button>
+                <button class="btn-estimate" onclick="openEstimateModal()">💰 모바일 견적/정산표</button>
             </div>
             <div class="plan-content" id="plan-display"></div>
+        </div>
+    </div>
+
+    <!-- 모바일 전용 견적 & 실시간 정산 모달 -->
+    <div id="estimate-modal" class="modal">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h2 id="modal-title">💰 맞춤 예상 견적서</h2>
+                <button class="close-btn" onclick="closeEstimateModal()">&times;</button>
+            </div>
+            
+            <p style="font-size:0.85rem; color:#64748b; margin-bottom:12px;">* 금액을 터치하여 직접 수정하면 합계가 실시간으로 재계산됩니다.</p>
+            
+            <div class="calc-box">
+                <div class="calc-row">
+                    <label>👥 총 인원수</label>
+                    <input type="number" id="cost_people" value="1" min="1" oninput="recalculateTotal()">
+                </div>
+                <div class="calc-row">
+                    <label>🍲 식비/음료</label>
+                    <input type="number" id="cost_food" value="40000" step="1000" oninput="recalculateTotal()">
+                </div>
+                <div class="calc-row">
+                    <label>🛏️ 숙박비</label>
+                    <input type="number" id="cost_stay" value="0" step="5000" oninput="recalculateTotal()">
+                </div>
+                <div class="calc-row">
+                    <label>⛽ 주유/교통비</label>
+                    <input type="number" id="cost_fuel" value="30000" step="5000" oninput="recalculateTotal()">
+                </div>
+                <div class="calc-row">
+                    <label>🏄 체험/기타</label>
+                    <input type="number" id="cost_activity" value="0" step="5000" oninput="recalculateTotal()">
+                </div>
+            </div>
+
+            <div class="total-box">
+                <div class="total-title">전체 총 예상 경비</div>
+                <div class="total-val" id="grand-total">70,000 원</div>
+                <div class="per-person" id="per-person-total">1인당 부담금: 70,000 원</div>
+            </div>
+
+            <button type="button" class="btn-copy" onclick="copyEstimate()">📋 카톡 정산용 복사하기</button>
         </div>
     </div>
 
@@ -240,12 +278,18 @@ HTML_TEMPLATE = """
             }
 
             let headcountVal = document.querySelector('input[name="headcount"]:checked').value;
+            let peopleCount = 1;
             if (headcountVal === 'custom') {
                 const cVal = document.getElementById('custom_headcount').value.trim();
                 if (!cVal || parseInt(cVal) < 1) { alert('정확한 단체 인원수를 입력해주세요.'); return; }
                 headcountVal = `${cVal}명(단체)`;
+                peopleCount = parseInt(cVal);
+            } else {
+                peopleCount = parseInt(headcountVal) || 1;
+                headcountVal = `${headcountVal}명`;
             }
 
+            const durationVal = document.querySelector('input[name="duration"]:checked').value;
             const isBike = document.getElementById('is_bike_mode').checked;
             const avoidRoadEl = document.getElementById('avoid_large_roads');
             const avoidLargeRoads = isBike && avoidRoadEl ? avoidRoadEl.checked : false;
@@ -258,7 +302,8 @@ HTML_TEMPLATE = """
                 start_location: startLocation || "현재 위치",
                 destination: destination,
                 headcount: headcountVal,
-                duration: document.querySelector('input[name="duration"]:checked').value,
+                people_count: peopleCount,
+                duration: durationVal,
                 include_food: document.getElementById('include_food').checked,
                 include_stay: document.getElementById('include_stay').checked,
                 include_activity: document.getElementById('include_activity').checked,
@@ -267,6 +312,23 @@ HTML_TEMPLATE = """
                 avoid_large_roads: avoidLargeRoads,
                 styles: styleString
             };
+
+            // 모달 초기값 자동 설정
+            document.getElementById('cost_people').value = peopleCount;
+            if (durationVal.includes("1박 2일")) {
+                document.getElementById('cost_stay').value = 80000;
+                document.getElementById('cost_food').value = 70000;
+                document.getElementById('cost_fuel').value = 50000;
+            } else if (durationVal.includes("2박") || durationVal.includes("3박")) {
+                document.getElementById('cost_stay').value = 160000;
+                document.getElementById('cost_food').value = 120000;
+                document.getElementById('cost_fuel').value = 70000;
+            } else {
+                document.getElementById('cost_stay').value = 0;
+                document.getElementById('cost_food').value = 35000;
+                document.getElementById('cost_fuel').value = 25000;
+            }
+            recalculateTotal();
 
             document.getElementById('plan-form').style.display = 'none';
             document.getElementById('loading').style.display = 'block';
@@ -283,7 +345,7 @@ HTML_TEMPLATE = """
                 try {
                     data = JSON.parse(resText);
                 } catch(parseErr) {
-                    alert('서버 응답 지연(30초 초과) 또는 서버 오류가 발생했습니다. 잠시 후 다시 시도해주세요.');
+                    alert('서버 응답 지연 또는 오류가 발생했습니다. 잠시 후 다시 시도해주세요.');
                     resetForm();
                     return;
                 }
@@ -310,22 +372,45 @@ HTML_TEMPLATE = """
             document.getElementById('plan-form').style.display = 'block';
         }
 
-        function downloadPdf() {
-            const form = document.createElement('form');
-            form.method = 'POST';
-            form.action = '/download_pdf';
+        // 견적 모달 관리 및 실시간 재계산
+        function openEstimateModal() {
+            document.getElementById('modal-title').innerText = `💰 ${currentPayload.destination || '여행'} 견적 & 정산표`;
+            document.getElementById('estimate-modal').style.display = 'block';
+            recalculateTotal();
+        }
 
-            for (const key in currentPayload) {
-                const input = document.createElement('input');
-                input.type = 'hidden';
-                input.name = key;
-                input.value = currentPayload[key];
-                form.appendChild(input);
-            }
+        function closeEstimateModal() {
+            document.getElementById('estimate-modal').style.display = 'none';
+        }
 
-            document.body.appendChild(form);
-            form.submit();
-            document.body.removeChild(form);
+        function recalculateTotal() {
+            const people = parseInt(document.getElementById('cost_people').value) || 1;
+            const food = parseInt(document.getElementById('cost_food').value) || 0;
+            const stay = parseInt(document.getElementById('cost_stay').value) || 0;
+            const fuel = parseInt(document.getElementById('cost_fuel').value) || 0;
+            const activity = parseInt(document.getElementById('cost_activity').value) || 0;
+
+            const total = (food * people) + stay + fuel + (activity * people);
+            const perPerson = Math.round(total / people);
+
+            document.getElementById('grand-total').innerText = total.toLocaleString() + ' 원';
+            document.getElementById('per-person-total').innerText = `1인당 정산금: ${perPerson.toLocaleString()} 원 (${people}인 기준)`;
+        }
+
+        function copyEstimate() {
+            const people = document.getElementById('cost_people').value;
+            const total = document.getElementById('grand-total').innerText;
+            const perPerson = document.getElementById('per-person-total').innerText;
+            
+            const text = `[🏍️ ${currentPayload.destination || '투어'} 예상 견적 및 정산]\n` +
+                         `- 일정: ${currentPayload.duration || '당일'}\n` +
+                         `- 총 경비: ${total}\n` +
+                         `- ${perPerson}\n` +
+                         `\n함께 즐거운 라이딩해요! 안전운전!`;
+
+            navigator.clipboard.writeText(text).then(() => {
+                alert('📋 카카오톡 정산용 텍스트가 복사되었습니다! 대화방에 붙여넣기 하세요.');
+            });
         }
     </script>
 </body>
@@ -459,112 +544,6 @@ def generate():
         if "429" in err_msg or "Quota exceeded" in err_msg or "RESOURCE_EXHAUSTED" in err_msg:
             return jsonify({'error': '⚠️ 오늘 무료 AI 사용량(20회)이 모두 소진되었습니다.\n한국 시간 기준 내일 오후 4시에 자동 초기화됩니다.'}), 429
         return jsonify({'error': f'서버 처리 오류: {err_msg}'}), 500
-
-@app.route('/download_pdf', methods=['POST'])
-def download_pdf():
-    try:
-        destination = request.form.get('destination', '맞춤')
-        headcount = request.form.get('headcount', '1명')
-        duration = request.form.get('duration', '당일치기')
-        styles = request.form.get('styles', '자유 여행')
-
-        genai.configure(api_key=API_KEY)
-        model = genai.GenerativeModel("gemini-3.6-flash")
-
-        pdf_prompt = f"""
-        PDF 인쇄용 [여행 견적 요약서]를 간결히 작성하세요. URL 링크는 일절 넣지 마세요.
-        - 목적지: {destination} | 인원: {headcount} | 일정: {duration} | 스타일: {styles}
-
-        # {destination} 여행 핵심 견적서 ({headcount}, {duration})
-        ## 1. 예상 경비 견적표
-        - 식비/숙박비/체험비/교통비 항목별 산출
-        - [1인당 총 예상 경비]: OOO원
-        - [{headcount} 전체 총 예상 경비]: OOO원
-        ## 2. 핵심 장소 요약 (명칭 및 주소)
-        """
-
-        res = model.generate_content(
-            pdf_prompt,
-            generation_config={"temperature": 0.4}
-        )
-        pdf_text = res.text
-
-        buffer = io.BytesIO()
-        doc = SimpleDocTemplate(
-            buffer,
-            pagesize=A4,
-            rightMargin=28,
-            leftMargin=28,
-            topMargin=30,
-            bottomMargin=30
-        )
-
-        styles_set = getSampleStyleSheet()
-
-        body_style = ParagraphStyle(
-            name='PdfBody',
-            fontName=MAIN_FONT,
-            fontSize=10,
-            leading=15,
-            textColor=colors.HexColor('#222222'),
-            spaceAfter=4
-        )
-        h1_style = ParagraphStyle(
-            name='PdfH1',
-            fontName=MAIN_FONT,
-            fontSize=14,
-            leading=18,
-            textColor=colors.HexColor('#1e3d59'),
-            spaceBefore=10,
-            spaceAfter=6,
-            keepWithNext=True
-        )
-        h2_style = ParagraphStyle(
-            name='PdfH2',
-            fontName=MAIN_FONT,
-            fontSize=11.5,
-            leading=16,
-            textColor=colors.HexColor('#0b7285'),
-            spaceBefore=8,
-            spaceAfter=4,
-            keepWithNext=True
-        )
-
-        story = []
-        lines = pdf_text.split('\n')
-
-        for line in lines:
-            line_str = line.strip()
-            if not line_str or line_str.startswith('---'):
-                story.append(Spacer(1, 4))
-                continue
-
-            safe_text = saxutils.escape(line_str)
-            safe_text = re.sub(r'\*\*(.*?)\*\*', r'<b>\1</b>', safe_text)
-
-            if line_str.startswith('# '):
-                clean_h1 = re.sub(r'^#\s*', '', safe_text)
-                story.append(Paragraph(clean_h1, h1_style))
-            elif line_str.startswith('## '):
-                clean_h2 = re.sub(r'^##\s*', '', safe_text)
-                story.append(Paragraph(clean_h2, h2_style))
-            elif line_str.startswith('### '):
-                clean_h3 = re.sub(r'^###\s*', '', safe_text)
-                story.append(Paragraph(clean_h3, h2_style))
-            else:
-                story.append(Paragraph(safe_text, body_style))
-
-        doc.build(story)
-        buffer.seek(0)
-
-        return send_file(
-            buffer,
-            as_attachment=True,
-            download_name=f"{destination}_여행견적서.pdf",
-            mimetype="application/pdf"
-        )
-    except Exception as e:
-        return f"PDF 생성 중 오류 발생: {str(e)}", 500
 
 if __name__ == '__main__':
     port = int(os.environ.get('PORT', 5000))
