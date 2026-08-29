@@ -20,7 +20,7 @@ HTML_TEMPLATE = """
     <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
     <meta name="apple-mobile-web-app-title" content="AI여행플래너">
 
-    <title>박영선의 AI 맞춤 여행 플래너</title>
+    <title>로이의 여행일기</title>
     
     <link rel="manifest" href="/manifest.json">
     <link rel="apple-touch-icon" href="/icon-512.png">
