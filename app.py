@@ -20,7 +20,7 @@ HTML_TEMPLATE = """
     <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
     <meta name="apple-mobile-web-app-title" content="AI여행플래너">
 
-    <title>로이의 여행일기</title>
+    <title>Roy's Travel Log</title>
     
     <link rel="manifest" href="/manifest.json">
     <link rel="apple-touch-icon" href="/icon-512.png">
@@ -70,7 +70,7 @@ HTML_TEMPLATE = """
 </head>
 <body>
     <div class="container">
-        <h1>🏍️ 로이의 여행일기</h1>
+        <h1>🏍️ Roy's Travel Log</h1>
         
         <form id="plan-form">
             <div class="section-title">1. 지역 구분</div>
