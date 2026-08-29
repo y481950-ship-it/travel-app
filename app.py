@@ -169,7 +169,7 @@ HTML_TEMPLATE = """
                     const lon = pos.coords.longitude;
                     try {
                         const controller = new AbortController();
-                        const tId = setTimeout(() => controller.abort(), 3000);
+                        const tId = setTimeout(() => controller.abort(), 2500);
                         const res = await fetch(`https://nominatim.openstreetmap.org/reverse?format=json&lat=${lat}&lon=${lon}&accept-language=ko`, { signal: controller.signal });
                         clearTimeout(tId);
                         const data = await res.json();
@@ -192,7 +192,7 @@ HTML_TEMPLATE = """
                 }, () => {
                     detectedAddress = "현재 위치";
                     document.getElementById('gps-info').innerText = "📍 현재 위치";
-                }, { timeout: 3500 });
+                }, { timeout: 3000 });
             }
         }
 
@@ -279,7 +279,15 @@ HTML_TEMPLATE = """
                     body: JSON.stringify(currentPayload)
                 });
                 
-                const data = await res.json();
+                const resText = await res.text();
+                let data;
+                try {
+                    data = JSON.parse(resText);
+                } catch(parseErr) {
+                    alert('서버 응답 지연(30초 초과) 또는 서버 오류가 발생했습니다. 잠시 후 다시 시도해주세요.');
+                    resetForm();
+                    return;
+                }
                 
                 if (!res.ok || data.error) {
                     alert(data.error || '생성 중 오류가 발생했습니다.');
@@ -292,7 +300,7 @@ HTML_TEMPLATE = """
                 document.getElementById('result-area').style.display = 'block';
                 window.scrollTo({ top: 0, behavior: 'smooth' });
             } catch (err) {
-                alert('요청 처리 오류: ' + (err.message || '서버 응답 시간 초과'));
+                alert('통신 오류가 발생했습니다. 잠시 후 다시 시도해주세요.');
                 resetForm();
             }
         }
@@ -382,80 +390,80 @@ def generate():
         styles = data.get('styles', '자유 여행')
 
         options = []
-        output_sections = ["## 1. 최적 코스 (카카오맵 경유지)"]
+        output_sections = ["## 1. 최적 코스 및 카카오맵 경유지"]
         sec_num = 2
 
         if data.get('include_food'):
-            options.append("- 로컬 맛집 2곳 (카카오맵 링크 포함)")
-            output_sections.append(f"## {sec_num}. 현지 맛집 & 노포")
+            options.append("- 맛집/노포: 2곳 추천 및 카카오맵 링크")
+            output_sections.append(f"## {sec_num}. 현지 로컬 맛집")
             sec_num += 1
         if data.get('include_stay'):
-            options.append("- 가성비 숙소 1곳 (카카오맵 링크 포함)")
-            output_sections.append(f"## {sec_num}. 추천 숙소")
+            options.append("- 숙소: 1곳 추천 및 카카오맵 링크")
+            output_sections.append(f"## {sec_num}. 가성비 숙소")
             sec_num += 1
         if data.get('include_activity'):
-            options.append("- 액티비티/체험 1곳 (카카오맵 링크 포함)")
-            output_sections.append(f"## {sec_num}. 추천 체험")
+            options.append("- 액티비티: 1곳 추천 및 카카오맵 링크")
+            output_sections.append(f"## {sec_num}. 체험 액티비티")
             sec_num += 1
         if data.get('include_fishing'):
-            options.append("- 선상 낚시 1곳 (카카오맵 링크 포함)")
+            options.append("- 선상 낚시: 1곳 추천 및 카카오맵 링크")
             output_sections.append(f"## {sec_num}. 선상 낚시")
             sec_num += 1
 
-        output_sections.append(f"## {sec_num}. 주행 팁 및 주의구간")
+        output_sections.append(f"## {sec_num}. 라이딩 주의구간 & 핵심 팁")
 
-        options_text = "\n".join(options) if options else "기본 경로 위주"
+        options_text = "\n".join(options) if options else "경로 위주"
         output_format_text = "\n".join(output_sections)
 
         prompt = f"""
-        대한민국 바이크 투어링/여행 전문가로서 핵심만 군더더기 없이 간결하게 작성하세요.
-        *주의: 체크 해제된 항목은 본문에 아예 적지 마세요.*
+        당신은 바이크 투어 전문가입니다. 불필요한 서론/결론/미사여구 없이 즉시 출력 양식에 맞추어 핵심 리스트만 간결하고 명확하게 작성하세요.
+        *주의: 체크 해제된 항목은 절대 작성하지 마세요.*
 
         [조건]
-        - 지역: {region_type} | 출발지: {start_location} | 목적지: {destination}
-        - 인원: {headcount} | 일정: {duration} | 스타일: {styles}
+        - 지역: {region_type} | 출발: {start_location} | 도착: {destination}
+        - 인원: {headcount} | 일정: {duration} | 테마: {styles}
 
-        [포함 요청 항목]
+        [포함 항목]
         {options_text}
         """
 
         if data.get('is_bike_mode'):
             prompt += """
-        [경로 규칙 - 카카오맵 최적화]
-        - 고속도로/자동차 전용도로 절대 제외.
-        - 첫 경유지는 출발 50분 후 지점부터.
-        - 카카오맵에 칠 수 있는 교차로/삼거리/고개 정상 명칭 명시.
+        [바이크 경로 필수 규칙]
+        1. 자동차 전용도로/고속도로 완전 배제.
+        2. 첫 경유지는 출발 50분 후 지점부터.
+        3. 카카오맵 검색 가능한 교차로/삼거리/고개 정상 명칭 명시.
         """
             if data.get('avoid_large_roads'):
                 prompt += """
-        - 4차선 직선국도 피하고 2차선 지방도/옛길 경유지를 촘촘히 넣을 것.
+        4. 4차선 국도 배제: 2차선 와인딩/지방도/옛길 위주 경유지 설정.
         """
         else:
             prompt += f"""
         [일반 모드]
-        - 목적지({destination}) 명소 코스 중심 간결 작성.
+        - 목적지({destination}) 중심 명소 및 효율 코스 간결 작성.
         """
 
         if region_type == "국내":
             prompt += """
-        [지도 링크]
-        주요 장소명: [카카오맵](https://map.kakao.com/link/search/{장소명}) | [네이버지도](https://map.naver.com/v5/search/{장소명})
+        [지도 링크 포맷]
+        장소명 뒤: [카카오맵](https://map.kakao.com/link/search/{장소명}) | [네이버지도](https://map.naver.com/v5/search/{장소명})
             """
         else:
             prompt += """
-        [지도 링크]
+        [지도 링크 포맷]
         [구글지도](https://www.google.com/maps/search/?api=1&query={장소명})
             """
 
         prompt += f"""
         [출력 양식]
-        # {destination} 여행 코스 ({headcount}, {duration})
+        # {destination} 맞춤 여행 코스 ({headcount}, {duration})
         {output_format_text}
         """
 
         response = model.generate_content(
             prompt,
-            generation_config={"max_output_tokens": 2048, "temperature": 0.6}
+            generation_config={"temperature": 0.5}
         )
         raw_text = response.text
         html_text = markdown_to_html(raw_text)
@@ -479,7 +487,7 @@ def download_pdf():
         model = genai.GenerativeModel("gemini-3.6-flash")
 
         pdf_prompt = f"""
-        PDF 인쇄용 [여행 견적서]를 간결히 요약 작성하세요.
+        PDF 인쇄용 [여행 견적 요약서]를 간결히 작성하세요.
         - 목적지: {destination} | 인원: {headcount} | 일정: {duration} | 스타일: {styles}
 
         # {destination} 여행 핵심 견적서 ({headcount}, {duration})
@@ -487,12 +495,12 @@ def download_pdf():
         - 식비/숙박비/체험비/교통비 항목별 산출
         - [1인당 총 예상 경비]: OOO원
         - [{headcount} 전체 총 예상 경비]: OOO원
-        ## 2. 엄선 장소 핵심 요약
+        ## 2. 핵심 요약
         """
 
         res = model.generate_content(
             pdf_prompt,
-            generation_config={"max_output_tokens": 1000, "temperature": 0.6}
+            generation_config={"temperature": 0.5}
         )
         pdf_text = res.text
 
