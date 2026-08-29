@@ -202,7 +202,6 @@ HTML_TEMPLATE = """
                 const infoEl = document.getElementById('gps-info');
                 infoEl.innerText = "🛰️ 고정밀 GPS 위치 측정 중...";
                 
-                // 실제 위성 GPS 하드웨어 강제 호출
                 const geoOptions = {
                     enableHighAccuracy: true,
                     timeout: 8000,
@@ -215,7 +214,6 @@ HTML_TEMPLATE = """
                     try {
                         const controller = new AbortController();
                         const tId = setTimeout(() => controller.abort(), 4000);
-                        // zoom=18로 상세 건물/동 레벨까지 요청
                         const res = await fetch(`https://nominatim.openstreetmap.org/reverse?format=json&lat=${lat}&lon=${lon}&zoom=18&addressdetails=1&accept-language=ko`, { signal: controller.signal });
                         clearTimeout(tId);
                         const data = await res.json();
@@ -223,7 +221,6 @@ HTML_TEMPLATE = """
                         
                         const province = addr.province || addr.city || addr.state || "";
                         const city = addr.city || addr.county || addr.district || "";
-                        // 세부 행정동/법정동/리 순차적 정밀 탐색
                         const town = addr.neighbourhood || addr.suburb || addr.quarter || addr.town || addr.village || addr.hamlet || "";
                         
                         let full = "";
@@ -274,7 +271,7 @@ HTML_TEMPLATE = """
             const infoEl = document.getElementById('gps-info');
             input.style.display = isCustom ? 'block' : 'none';
             infoEl.style.display = isCustom ? 'none' : 'block';
-            input.placeholder = '출발지 입력 (예: 서울 강남, 여주 월송동)';
+            input.placeholder = '출발지 입력 (예: 여주 월송동)';
         }
 
         function toggleHeadcountInput() {
@@ -335,7 +332,6 @@ HTML_TEMPLATE = """
                 styles: styleString
             };
 
-            // 모달 초기값 자동 설정
             document.getElementById('cost_people').value = peopleCount;
             if (durationVal.includes("1박 2일")) {
                 document.getElementById('cost_stay').value = 80000;
@@ -394,7 +390,6 @@ HTML_TEMPLATE = """
             document.getElementById('plan-form').style.display = 'block';
         }
 
-        // 견적 모달 관리 및 실시간 재계산
         function openEstimateModal() {
             document.getElementById('modal-title').innerText = `💰 ${currentPayload.destination || '여행'} 견적 & 정산표`;
             document.getElementById('estimate-modal').style.display = 'block';
@@ -499,19 +494,19 @@ def generate():
         sec_num = 2
 
         if data.get('include_food'):
-            options.append("- 로컬 맛집/노포: 2곳 (상호명 및 도로명/지번 주소)")
+            options.append("- 로컬 맛집/노포: 2곳 (실제 등록된 정확한 상호명 및 시/군/구 읍/면/동/리)")
             output_sections.append(f"## {sec_num}. 현지 로컬 맛집")
             sec_num += 1
         if data.get('include_stay'):
-            options.append("- 추천 숙소: 1곳 (숙소명 및 도로명/지번 주소)")
+            options.append("- 추천 숙소: 1곳 (실제 등록된 정확한 펜션/호텔 상호명)")
             output_sections.append(f"## {sec_num}. 가성비 숙소")
             sec_num += 1
         if data.get('include_activity'):
-            options.append("- 액티비티/체험: 1곳 (장소명 및 도로명/지번 주소)")
+            options.append("- 액티비티/체험: 1곳 (실제 시설명/명소명)")
             output_sections.append(f"## {sec_num}. 체험 액티비티")
             sec_num += 1
         if data.get('include_fishing'):
-            options.append("- 선상 낚시: 1곳 (선단/항구명 및 주소)")
+            options.append("- 선상 낚시: 1곳 (실제 선단명 및 항구명)")
             output_sections.append(f"## {sec_num}. 선상 낚시")
             sec_num += 1
 
@@ -521,9 +516,14 @@ def generate():
         output_format_text = "\n".join(output_sections)
 
         prompt = f"""
-        당신은 대한민국 최고의 바이크 투어링 길안내 전문가입니다.
-        인터넷 URL 링크는 완전히 제외하고, 네비게이션(카카오맵/티맵)에 찍을 [정확한 명칭 + 도로명/지번 주소] 위주로 군더더기 없이 간결하게 작성하세요.
-        *주의: 체크 해제된 항목은 본문에 아예 적지 마세요.*
+        당신은 대한민국 바이크 투어링 네비게이션 전문가입니다.
+
+        [★ 네비게이션 검색어 절대 원칙 - 엄격 준수 ★]
+        1. 존재하지 않는 가짜 건물번호나 지번 번지수를 임의로 지어내지 마십시오.
+        2. 네비(카카오맵/티맵) 검색 시 100% 한 번에 잡히는 [공식 명칭] 위주로 작성하십시오.
+           - 교차로/삼거리의 경우: 카카오맵에 등록된 공식 명칭(예: '오량삼거리', '모곡삼거리', '행치령') 또는 바로 옆 랜드마크(예: '소태초등학교', '양동농협', '단월주유소') 형태로 검색어를 표기할 것.
+           - 주소 표기 시: 확실하지 않은 세부 번지수(예: 522, 293-1 등)는 절대 지어내지 말고, 행정구역(예: '충청북도 충주시 소태면 오량리')까지만 정확히 적거나 실존 건물명만 표기할 것.
+        3. 인터넷 URL 링크는 일절 작성하지 마십시오.
 
         [조건]
         - 구분: {region_type} | 출발: {start_location} | 도착: {destination}
@@ -535,11 +535,11 @@ def generate():
 
         if data.get('is_bike_mode'):
             prompt += """
-        [★ 바이크 경로 및 경유지 지정 절대 규칙 ★]
+        [★ 바이크 경로 및 경유지 지정 규칙 ★]
         1. 자동차 전용도로 및 고속도로 절대 배제.
-        2. '경유지'는 휴게소나 쉬는 곳이 아니라, **네비가 빠른 4차선 직선 국도로 우회하지 못하도록 2차선 지방도로 강제 유도하는 [길목 방어용 경유지]**입니다.
-        3. 출발지에서 첫 구간부터 4차선 국도(예: 3번, 6번, 44번 국도 등)를 절대 타지 않도록, 출발 직후 2차선 시골길/옛길로 진입하는 '첫 번째 분기점 삼거리/교차로'를 [경유지 1]로 반드시 지정할 것.
-        4. 전체 경로에 걸쳐 4차선 대로 합류를 막기 위해 2차선 지방도/옛길 삼거리, 회전교차로, 고개 정상 등을 촘촘히 연결할 것.
+        2. '경유지'는 휴식처가 아니라, **네비가 4차선 직선 국도(예: 3번, 6번, 38번, 44번 국도 등)로 빠지지 못하게 2차선 지방도로 묶어두는 [길목 방어용 경유지]**입니다.
+        3. 출발 직후 2차선 시골길/지방도로 진입하는 '첫 번째 분기점/삼거리/랜드마크'를 [경유지 1]로 반드시 지정할 것.
+        4. 전체 경로에 걸쳐 4차선 대로를 완전히 피할 수 있도록 2차선 지방도 삼거리, 회전교차로, 고개 정상 등을 촘촘히 배치할 것.
         """
         else:
             prompt += f"""
@@ -548,14 +548,22 @@ def generate():
         """
 
         prompt += f"""
-        [출력 양식]
+        [출력 양식 예시]
         # {destination} 맞춤 코스 ({headcount}, {duration})
+        ## 1. 최적 코스 및 4차선 방어용 경유지 목록
+        * [출발지] (출발지 명칭)
+        * [경유지 1] 지평삼거리 (네비 검색어: 지평삼거리 / 경기 양평군 지평면 지평리)
+          - 방어 목적: 6번 국도 대신 341번 지방도 우회
+        * [경유지 2] 오량삼거리 (네비 검색어: 오량삼거리 또는 소태초등학교 / 충북 충주시 소태면 오량리)
+          - 방어 목적: 38번 4차선 국도 진입 차단
+        ...
+
         {output_format_text}
         """
 
         response = model.generate_content(
             prompt,
-            generation_config={"temperature": 0.4}
+            generation_config={"temperature": 0.3}
         )
         raw_text = response.text
         html_text = markdown_to_html(raw_text)
