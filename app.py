@@ -70,7 +70,7 @@ HTML_TEMPLATE = """
 </head>
 <body>
     <div class="container">
-        <h1>🏍️ 박영선의 AI 맞춤 여행 플래너</h1>
+        <h1>🏍️ 로이의 여행일기</h1>
         
         <form id="plan-form">
             <div class="section-title">1. 지역 구분</div>
