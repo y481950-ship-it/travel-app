@@ -388,23 +388,23 @@ def generate():
         styles = data.get('styles', '자유 여행')
 
         options = []
-        output_sections = ["## 1. 최적 코스 및 네비 입력용 경유지 목록"]
+        output_sections = ["## 1. 최적 코스 및 4차선 방어용 경유지 목록"]
         sec_num = 2
 
         if data.get('include_food'):
-            options.append("- 로컬 맛집/노포: 2곳 (상호명 및 도로명/지번 주소 명시)")
+            options.append("- 로컬 맛집/노포: 2곳 (상호명 및 도로명/지번 주소)")
             output_sections.append(f"## {sec_num}. 현지 로컬 맛집")
             sec_num += 1
         if data.get('include_stay'):
-            options.append("- 추천 숙소: 1곳 (숙소명 및 도로명/지번 주소 명시)")
+            options.append("- 추천 숙소: 1곳 (숙소명 및 도로명/지번 주소)")
             output_sections.append(f"## {sec_num}. 가성비 숙소")
             sec_num += 1
         if data.get('include_activity'):
-            options.append("- 액티비티/체험: 1곳 (장소명 및 도로명/지번 주소 명시)")
+            options.append("- 액티비티/체험: 1곳 (장소명 및 도로명/지번 주소)")
             output_sections.append(f"## {sec_num}. 체험 액티비티")
             sec_num += 1
         if data.get('include_fishing'):
-            options.append("- 선상 낚시: 1곳 (선단/항구명 및 주소 명시)")
+            options.append("- 선상 낚시: 1곳 (선단/항구명 및 주소)")
             output_sections.append(f"## {sec_num}. 선상 낚시")
             sec_num += 1
 
@@ -414,8 +414,8 @@ def generate():
         output_format_text = "\n".join(output_sections)
 
         prompt = f"""
-        당신은 대한민국 최고의 여행/바이크 투어 전문가입니다. 
-        인터넷 URL 링크는 일절 작성하지 마시고, 네비게이션 검색창에 바로 입력할 수 있는 [정확한 명칭 + 도로명 또는 지번 주소] 위주로 간결하고 명확하게 작성하세요.
+        당신은 대한민국 최고의 바이크 투어링 길안내 전문가입니다.
+        인터넷 URL 링크는 완전히 제외하고, 네비게이션(카카오맵/티맵)에 찍을 [정확한 명칭 + 도로명/지번 주소] 위주로 군더더기 없이 간결하게 작성하세요.
         *주의: 체크 해제된 항목은 본문에 아예 적지 마세요.*
 
         [조건]
@@ -428,14 +428,11 @@ def generate():
 
         if data.get('is_bike_mode'):
             prompt += """
-        [바이크 경로 규칙]
-        1. 고속도로 및 자동차 전용도로 완전 배제.
-        2. 첫 경유지는 출발지에서 최소 50분 주행한 지점부터 지정.
-        3. 네비게이션 검색용 경유지 작성 시: 교차로명, 삼거리명, 고개 정상 휴게소 등 구체적 지명과 주소를 반드시 표기.
-        """
-            if data.get('avoid_large_roads'):
-                prompt += """
-        4. 4차선 국도 배제: 2차선 와인딩/지방도/옛길 위주 경유지 촘촘히 설정.
+        [★ 바이크 경로 및 경유지 지정 절대 규칙 ★]
+        1. 자동차 전용도로 및 고속도로 절대 배제.
+        2. '경유지'는 휴게소나 쉬는 곳이 아니라, **네비가 빠른 4차선 직선 국도로 우회하지 못하도록 2차선 지방도로 강제 유도하는 [길목 방어용 경유지]**입니다.
+        3. 출발지에서 첫 구간부터 4차선 국도(예: 3번, 6번, 44번 국도 등)를 절대 타지 않도록, 출발 직후 2차선 시골길/옛길로 진입하는 '첫 번째 분기점 삼거리/교차로'를 [경유지 1]로 반드시 지정할 것.
+        4. 전체 경로에 걸쳐 4차선 대로 합류를 막기 위해 2차선 지방도/옛길 삼거리, 회전교차로, 고개 정상 등을 촘촘히 연결할 것.
         """
         else:
             prompt += f"""
@@ -445,7 +442,7 @@ def generate():
 
         prompt += f"""
         [출력 양식]
-        # {destination} 맞춤 여행 코스 ({headcount}, {duration})
+        # {destination} 맞춤 코스 ({headcount}, {duration})
         {output_format_text}
         """
 
