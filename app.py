@@ -20,7 +20,7 @@ HTML_TEMPLATE = """
     <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
     <meta name="apple-mobile-web-app-title" content="AI여행플래너">
 
-    <title>Roy's Travel Log</title>
+    <title>박영선의 AI 맞춤 여행 플래너</title>
     
     <link rel="manifest" href="/manifest.json">
     <link rel="apple-touch-icon" href="/icon-512.png">
@@ -35,18 +35,18 @@ HTML_TEMPLATE = """
         .radio-group, .checkbox-group { display: flex; flex-wrap: wrap; gap: 6px; margin-bottom: 10px; }
         .radio-group label, .checkbox-group label { background: #f1f3f5; padding: 7px 11px; border-radius: 8px; font-size: 0.9rem; cursor: pointer; display: flex; align-items: center; gap: 5px; }
         input[type="text"], input[type="number"] { width: 100%; padding: 11px; border: 1px solid #ced4da; border-radius: 8px; font-size: 0.95rem; margin-bottom: 10px; }
-        button { width: 100%; padding: 13px; background: #1a73e8; color: #fff; border: none; border-radius: 8px; font-size: 1.05rem; font-weight: bold; cursor: pointer; margin-top: 10px; }
-        #loading { display: none; text-align: center; padding: 24px; font-weight: bold; color: #1a73e8; font-size: 1.05rem; }
+        button { width: 100%; padding: 13px; background: #03c75a; color: #fff; border: none; border-radius: 8px; font-size: 1.05rem; font-weight: bold; cursor: pointer; margin-top: 10px; }
+        #loading { display: none; text-align: center; padding: 24px; font-weight: bold; color: #03c75a; font-size: 1.05rem; }
         #result-area { display: none; margin-top: 16px; }
         .btn-group { display: flex; gap: 8px; margin-bottom: 14px; }
         .btn-group button { margin-top: 0; }
         .btn-reset { background: #6c757d; }
-        .btn-estimate { background: #2b8a3e; }
+        .btn-estimate { background: #1e3d59; }
         .plan-content { background: #fafafa; border: 1px solid #e2e8f0; padding: 14px; border-radius: 8px; font-size: 0.95rem; line-height: 1.6; }
         .plan-content h1 { font-size: 1.25rem; color: #1e3d59; text-align: left; margin: 16px 0 8px; border-bottom: 2px solid #1e3d59; padding-bottom: 4px; }
-        .plan-content h2 { font-size: 1.1rem; color: #0b7285; margin: 14px 0 6px; }
-        .plan-content h3 { font-size: 1rem; color: #2b8a3e; margin: 10px 0 4px; }
-        .gps-status { font-size: 0.82rem; color: #1a73e8; margin-top: -6px; margin-bottom: 8px; display: block; }
+        .plan-content h2 { font-size: 1.1rem; color: #03c75a; margin: 14px 0 6px; }
+        .plan-content h3 { font-size: 1rem; color: #0b7285; margin: 10px 0 4px; }
+        .gps-status { font-size: 0.82rem; color: #03c75a; margin-top: -6px; margin-bottom: 8px; display: block; }
 
         /* 모바일 견적서/정산 모달 카드 UI */
         .modal { display: none; position: fixed; z-index: 1000; left: 0; top: 0; width: 100%; height: 100%; background: rgba(0,0,0,0.5); backdrop-filter: blur(2px); }
@@ -65,12 +65,12 @@ HTML_TEMPLATE = """
         .total-box .total-val { font-size: 1.4rem; color: #0284c7; font-weight: 800; margin: 4px 0; }
         .total-box .per-person { font-size: 0.95rem; color: #0f172a; font-weight: bold; }
 
-        .btn-copy { background: #3b82f6; font-size: 0.95rem; padding: 10px; margin-top: 0; }
+        .btn-copy { background: #03c75a; font-size: 0.95rem; padding: 10px; margin-top: 0; }
     </style>
 </head>
 <body>
     <div class="container">
-        <h1>🏍️ Roy's Travel Log</h1>
+        <h1>🏍️ 박영선의 AI 맞춤 여행 플래너</h1>
         
         <form id="plan-form">
             <div class="section-title">1. 지역 구분</div>
@@ -185,7 +185,7 @@ HTML_TEMPLATE = """
                 <div class="per-person" id="per-person-total">1인당 정산금: 70,000 원</div>
             </div>
 
-            <button type="button" class="btn-copy" onclick="copyEstimate()">📋 카톡 정산용 복사하기</button>
+            <button type="button" class="btn-copy" onclick="copyEstimate()">📋 정산용 텍스트 복사하기</button>
         </div>
     </div>
 
@@ -197,7 +197,6 @@ HTML_TEMPLATE = """
         let currentPayload = {};
         let detectedAddress = "현재 위치";
 
-        // 뒤로가기 가로채기 방어 로직 (초기 진입 시 히스토리 2중 잠금)
         function setupHistoryTrap() {
             history.pushState({ page: 'guard' }, '', location.href);
             history.pushState({ page: 'main' }, '', location.href);
@@ -210,21 +209,18 @@ HTML_TEMPLATE = """
             const modal = document.getElementById('estimate-modal');
             const resultArea = document.getElementById('result-area');
 
-            // 1. 견적 모달이 열려있으면 모달만 닫기
             if (modal && modal.style.display === 'block') {
                 closeEstimateModal();
                 history.pushState({ page: 'main' }, '', location.href);
                 return;
             }
 
-            // 2. 결과 화면이면 입력창(첫 화면)으로 복귀
             if (resultArea && resultArea.style.display === 'block') {
                 resetForm();
                 history.pushState({ page: 'main' }, '', location.href);
                 return;
             }
 
-            // 3. 첫 화면일 때 완전히 앱 종료 여부 확인
             setTimeout(() => {
                 const answer = confirm("앱을 완전히 종료하시겠습니까?");
                 if (answer) {
@@ -462,10 +458,10 @@ HTML_TEMPLATE = """
                          `- 일정: ${currentPayload.duration || '당일'}\n` +
                          `- 총 경비: ${total}\n` +
                          `- ${perPerson}\n` +
-                         `\n함께 즐거운 라이딩해요! 안전운전!`;
+                         `\n함께 즐거운 여행해요! 안전운전!`;
 
             navigator.clipboard.writeText(text).then(() => {
-                alert('📋 카카오톡 정산용 텍스트가 복사되었습니다! 대화방에 붙여넣기 하세요.');
+                alert('📋 정산용 텍스트가 복사되었습니다!');
             });
         }
     </script>
@@ -527,82 +523,100 @@ def generate():
         headcount = data.get('headcount', '1명')
         duration = data.get('duration', '당일치기')
         styles = data.get('styles', '자유 여행')
+        is_bike_mode = data.get('is_bike_mode', False)
 
         options = []
-        output_sections = ["## 1. 최적 코스 및 4차선 방어용 경유지 목록"]
-        sec_num = 2
+        output_sections = []
+        sec_num = 1
+
+        if is_bike_mode:
+            output_sections.append(f"## {sec_num}. 4차선 국도 완전 차단 촘촘한 경유지 목록 (네이버 내비 입력 순서)")
+        else:
+            output_sections.append(f"## {sec_num}. 추천 이동 동선 및 일정 코스")
+        sec_num += 1
 
         if data.get('include_food'):
-            options.append("- 로컬 맛집/노포: 2곳 (실제 등록된 정확한 상호명 및 시/군/구 읍/면/동/리)")
-            output_sections.append(f"## {sec_num}. 현지 로컬 맛집")
+            options.append("""- [현지 로컬 맛집/노포 2곳 엄선]:
+  * 프랜차이즈/바이럴 식당 철저 배제. 현지 주민 노포 또는 토속 대표 음식점.
+  * 반드시 [네이버 지도]에 정식 등록된 실존 상호명, 읍/면/동 행정구역, 대표 시그니처 메뉴 명시.""")
+            output_sections.append(f"## {sec_num}. 엄선 현지 로컬 맛집")
             sec_num += 1
+
         if data.get('include_stay'):
-            options.append("- 추천 숙소: 1곳 (실제 등록된 정확한 펜션/호텔 상호명)")
-            output_sections.append(f"## {sec_num}. 가성비 숙소")
+            options.append("""- [가성비 추천 숙소 1곳 엄선]:
+  * 네이버 지도 등록 실존 호텔/펜션/모텔 상호명, 1박 예상 가격대, 주차 안전성 명시.""")
+            output_sections.append(f"## {sec_num}. 가성비 실속 숙소")
             sec_num += 1
+
         if data.get('include_activity'):
-            options.append("- 액티비티/체험: 1곳 (실제 시설명/명소명)")
-            output_sections.append(f"## {sec_num}. 체험 액티비티")
+            options.append("""- [체험 액티비티 1곳 엄선]:
+  * 지역 테마에 부합하는 네이버 지도 등록 실존 레포츠/체험 시설 공식 명칭 및 특징 명시.""")
+            output_sections.append(f"## {sec_num}. 추천 액티비티 체험")
             sec_num += 1
+
         if data.get('include_fishing'):
-            options.append("- 선상 낚시: 1곳 (실제 선단명 및 항구명)")
-            output_sections.append(f"## {sec_num}. 선상 낚시")
+            options.append("""- [선상 낚시 1곳 엄선]:
+  * 실제 운영 중인 낚시 선단/낚싯배 이름과 출항 항구(포구) 명칭, 주 어종 정보 명시.""")
+            output_sections.append(f"## {sec_num}. 베테랑 선상 낚시")
             sec_num += 1
 
-        output_sections.append(f"## {sec_num}. 라이딩 주의구간 & 핵심 팁")
+        output_sections.append(f"## {sec_num}. 라이딩 주의구간 & 4차선 이탈 방지 팁")
 
-        options_text = "\n".join(options) if options else "경로 위주"
+        options_text = "\n\n".join(options) if options else "경로 위주"
         output_format_text = "\n".join(output_sections)
 
         prompt = f"""
-        당신은 대한민국 바이크 투어링 네비게이션 전문가입니다.
+        당신은 대한민국 전국 2차선 와인딩 및 시골길 국도/지방도 전용 바이크 투어링 전문가입니다.
 
-        [★ 네비게이션 검색어 절대 원칙 - 엄격 준수 ★]
-        1. 존재하지 않는 가짜 건물번호나 지번 번지수를 임의로 지어내지 마십시오.
-        2. 네비(카카오맵/티맵) 검색 시 100% 한 번에 잡히는 [공식 명칭] 위주로 작성하십시오.
-           - 교차로/삼거리의 경우: 카카오맵에 등록된 공식 명칭(예: '오량삼거리', '모곡삼거리', '행치령') 또는 바로 옆 랜드마크(예: '소태초등학교', '양동농협', '단월주유소') 형태로 검색어를 표기할 것.
-           - 주소 표기 시: 확실하지 않은 세부 번지수(예: 522, 293-1 등)는 절대 지어내지 말고, 행정구역(예: '충청북도 충주시 소태면 오량리')까지만 정확히 적거나 실존 건물명만 표기할 것.
-        3. 인터넷 URL 링크는 일절 작성하지 마십시오.
+        [★ 네이버 지도 / 네이버 내비 100% 실존 검색 원칙 ★]
+        1. 모든 경유지와 상호명은 [네이버 지도(Naver Map)] 검색창에 쳤을 때 즉시 검색되는 [공식 명칭]만 사용하십시오.
+        2. 존재하지 않는 식당, 숙소, 가짜 지번 번지수는 절대로 지어내지 마십시오.
+        3. 주소는 세부 번지수 없이 시/군/구 읍/면/동/리 행정구역까지만 기재하십시오.
+        4. 웹사이트 URL 링크는 절대 작성하지 마십시오.
 
-        [조건]
+        [기본 조건]
         - 구분: {region_type} | 출발: {start_location} | 도착: {destination}
         - 인원: {headcount} | 일정: {duration} | 테마: {styles}
 
-        [포함 요청 항목]
+        [선택 옵션 요구사항]
         {options_text}
         """
 
-        if data.get('is_bike_mode'):
-            prompt += """
-        [★ 바이크 경로 및 경유지 지정 규칙 ★]
-        1. 자동차 전용도로 및 고속도로 절대 배제.
-        2. '경유지'는 휴식처가 아니라, **네비가 4차선 직선 국도(예: 3번, 6번, 38번, 44번 국도 등)로 빠지지 못하게 2차선 지방도로 묶어두는 [길목 방어용 경유지]**입니다.
-        3. 출발 직후 2차선 시골길/지방도로 진입하는 '첫 번째 분기점/삼거리/랜드마크'를 [경유지 1]로 반드시 지정할 것.
-        4. 전체 경로에 걸쳐 4차선 대로를 완전히 피할 수 있도록 2차선 지방도 삼거리, 회전교차로, 고개 정상 등을 촘촘히 배치할 것.
+        if is_bike_mode:
+            prompt += f"""
+        [★ 4차선 국도 완전 차단 촘촘한 경유지 설계 규칙 - 핵심 ★]
+        1. 네비는 경유지 사이가 조금만 멀어지면 즉시 4차선 전용 국도(예: 3번, 6번, 38번, 42번, 44번 국도 등) 및 교차로 IC로 유도합니다.
+        2. 이를 완벽히 방어하기 위해 **반드시 경유지 사이 간격을 15km~25km 내외로 촘촘하게 4~6곳 이상 배치**하십시오.
+        3. [경유지 1]은 출발지 직후 4차선 진입을 원천 차단하고 2차선 지방도로 꺾는 첫 번째 삼거리/교차로여야 합니다.
+        4. 경유지는 단순 명소가 아니라 **'4차선 국도 나들목(IC)을 우회하게 만드는 2차선 구도로 삼거리, 면사무소, 고갯길 정상, 강변 시골길 교차점'**으로 지정하십시오.
+        5. 각 경유지마다 [네이버 내비 검색어], [경유지 통과 후 따라갈 지방도 번호], [차단하는 4차선 국도 번호]를 구체적으로 명시하십시오.
+
+        [출력 양식 예시]
+        # {destination} 4차선 완전 배제 바이크 투어 ({headcount}, {duration})
+        ## 1. 4차선 국도 완전 차단 촘촘한 경유지 목록 (네이버 내비 입력 순서)
+        * [출발지] {start_location}
+        * [경유지 1] (네이버 검색어: 공식 명칭 / 예: 지평삼거리 또는 지평농협)
+          - 방어: 6번 4차선 국도 차단 -> 341번 2차선 지방도 유지
+        * [경유지 2] (네이버 검색어: 공식 명칭 / 예: 소태초등학교 또는 오량삼거리)
+          - 방어: 38번 4차선 고속화 국도 합류 차단 -> 531번 시골길 우회
+        * [경유지 3] ... (15~20km 단위로 촘촘히 연결)
+        * [경유지 4] ...
+        * [목적지] {destination}
+
+        {output_format_text}
         """
         else:
             prompt += f"""
-        [일반 모드 규칙]
-        - {destination} 목적지 중심 명소 및 효율 코스 위주 작성.
-        """
-
-        prompt += f"""
-        [출력 양식 예시]
-        # {destination} 맞춤 코스 ({headcount}, {duration})
-        ## 1. 최적 코스 및 4차선 방어용 경유지 목록
-        * [출발지] (출발지 명칭)
-        * [경유지 1] 지평삼거리 (네비 검색어: 지평삼거리 / 경기 양평군 지평면 지평리)
-          - 방어 목적: 6번 국도 대신 341번 지방도 우회
-        * [경유지 2] 오량삼거리 (네비 검색어: 오량삼거리 또는 소태초등학교 / 충북 충주시 소태면 오량리)
-          - 방어 목적: 38번 4차선 국도 진입 차단
-        ...
+        [★ 일반 여행 모드 규칙 ★]
+        1. 4차선 방어용 경유지 목록은 일절 작성하지 마십시오.
+        2. {start_location}에서 {destination}까지 방문하기 좋은 명소와 목적지 중심의 여행 동선/타임테이블로 작성하십시오.
 
         {output_format_text}
         """
 
         response = model.generate_content(
             prompt,
-            generation_config={"temperature": 0.3}
+            generation_config={"temperature": 0.25}
         )
         raw_text = response.text
         html_text = markdown_to_html(raw_text)
