@@ -6,7 +6,7 @@ import json
 
 app = Flask(__name__)
 
-API_KEY = "AQ.Ab8RN6KNyTYb9CRCpApOtdKKdV5AhjT07NZ5PVbe7ZSIzCXOPw"
+API_KEY = os.environ.get("GEMINI_API_KEY", "")
 
 HTML_TEMPLATE = """
 <!DOCTYPE html>
@@ -514,6 +514,8 @@ def index():
 def generate():
     try:
         data = request.get_json(force=True) or {}
+        if not API_KEY:
+            return jsonify({'error': '서버의 GEMINI_API_KEY 환경변수를 설정해주세요.'}), 503
         genai.configure(api_key=API_KEY)
         model = genai.GenerativeModel("gemini-3.6-flash")
 
